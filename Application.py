@@ -82,19 +82,25 @@ def preprocess_input(user_input):
     """Prepares input to match the trained model's feature set."""
     df = pd.DataFrame([user_input])  # Convert input to DataFrame
 
-    # Convert categorical features to match training format
-    df = pd.get_dummies(df)
+    # ✅ One-hot encode categorical features
+    categorical_features = ["contract_type", "internet_service", "payment_method", 
+                            "has_phone_service", "has_multiple_lines", 
+                            "has_online_security", "has_online_backup", 
+                            "has_device_protection"]
 
-    # Align columns with training data
+    df = pd.get_dummies(df, columns=categorical_features, drop_first=False)  
+
+    # ✅ Ensure all expected columns exist (adding missing ones with 0s)
     missing_cols = set(expected_columns) - set(df.columns)
     for col in missing_cols:
         df[col] = 0  # Add missing columns with default 0
 
-    extra_cols = set(df.columns) - set(expected_columns)
-    if extra_cols:
-        df = df.drop(columns=extra_cols)  # Remove unexpected columns
+    # ✅ Ensure correct column order
+    df = df[expected_columns]
 
-    df = df[expected_columns]  # Reorder columns
+    # ✅ Debugging: Print transformed DataFrame
+    st.write("📌 **Debug Mode: Processed Input DataFrame**")
+    st.write(df)
 
     return df
 
