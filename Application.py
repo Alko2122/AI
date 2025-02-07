@@ -1,74 +1,83 @@
 import streamlit as st
-import joblib
-import numpy as np
 import pandas as pd
+import numpy as np
+import joblib
+import os
 
-# ✅ Define CombinedModel BEFORE loading the model
-class CombinedModel:
-    def __init__(self, gbm, mlp):
-        self.gbm = gbm
-        self.mlp = mlp
+# Load trained model and column order
+MODEL_PATH = "gbm_mlp_model.pkl"
+COLUMNS_PATH = "columns.pkl"
 
-    def predict_proba(self, X):
-        gbm_preds = self.gbm.predict_proba(X)[:, 1]  
-        mlp_preds = self.mlp.predict_proba(X)[:, 1]  
-        combined_preds = (gbm_preds + mlp_preds) / 2  
-        return np.column_stack([1 - combined_preds, combined_preds])  
+# Function to safely load the model
+def load_model():
+    if os.path.exists(MODEL_PATH):
+        return joblib.load(MODEL_PATH)
+    else:
+        st.error(f"Error: Model file '{MODEL_PATH}' not found!")
+        return None
 
-# ✅ Now load the model
-try:
-    gbm_mlp_model = joblib.load("lgbm_mlp_model.pkl")
-    expected_columns = joblib.load("columns.pkl")  
-    st.success("Model loaded successfully!")
-except Exception as e:
-    st.error(f"Error loading model: {e}")
+# Function to safely load columns.pkl
+def load_columns():
+    if os.path.exists(COLUMNS_PATH):
+        return joblib.load(COLUMNS_PATH)
+    else:
+        st.error(f"Error: Column file '{COLUMNS_PATH}' not found!")
+        return None
 
+# Load model and columns
+gbm_mlp_model = load_model()
+expected_columns = load_columns()
 
-# Function to preprocess user input  
-def preprocess_input(user_input):  
-    """Prepares input to match the trained model's feature set."""  
-    df = pd.DataFrame([user_input])  
+if gbm_mlp_model is None or expected_columns is None:
+    st.stop()  # Stop execution if model or columns are missing
 
-    # Apply one-hot encoding (same as training)  
-    df = pd.get_dummies(df)  
+# Function to preprocess user input
+def preprocess_input(user_input):
+    """Prepares input to match the trained model's feature set."""
+    df = pd.DataFrame([user_input])  # Convert input to DataFrame
 
-    # Ensure correct feature ordering  
-    df = df.reindex(columns=expected_columns, fill_value=0)  
+    # Apply one-hot encoding (same as training)
+    df = pd.get_dummies(df)
 
-    return df  
+    # Align columns with training data
+    missing_cols = set(expected_columns) - set(df.columns)
+    for col in missing_cols:
+        df[col] = 0  # Add missing columns with default 0
 
-# Streamlit UI  
-st.title("Customer Churn Prediction App")  
+    df = df[expected_columns]  # Reorder columns
 
-# Get user input  
-user_input = {  
-    "TotalCharges": st.number_input("Total Charges", min_value=0.0, step=0.01),  
-    "InternetService_Fiber optic": st.selectbox("Fiber Optic Internet", [0, 1]),  
-    "Contract_Two year": st.selectbox("Two-Year Contract", [0, 1]),  
-    "TotalServices": st.number_input("Total Services Used", min_value=0, step=1),  
-    "Contract_One year": st.selectbox("One-Year Contract", [0, 1]),  
-    "gender": st.selectbox("Gender (1=Male, 0=Female)", [0, 1]),  
-    "PaperlessBilling": st.selectbox("Paperless Billing (1=Yes, 0=No)", [0, 1]),  
-    "MultipleLines_Yes": st.selectbox("Multiple Lines (1=Yes, 0=No)", [0, 1]),  
-    "PaymentMethod_Electronic check": st.selectbox("Electronic Check Payment", [0, 1]),  
-    "Tenure_Group_Established": st.selectbox("Established Tenure Group (1=Yes, 0=No)", [0, 1]),  
-    "Partner": st.selectbox("Partner (1=Yes, 0=No)", [0, 1]),  
-    "Dependents": st.selectbox("Dependents (1=Yes, 0=No)", [0, 1]),  
-    "SeniorCitizen": st.selectbox("Senior Citizen (1=Yes, 0=No)", [0, 1]),  
-    "InternetService_No": st.selectbox("No Internet Service (1=Yes, 0=No)", [0, 1]),  
-    "PaymentMethod_Credit card (automatic)": st.selectbox("Credit Card Payment", [0, 1]),  
-    "PaymentMethod_Mailed check": st.selectbox("Mailed Check Payment", [0, 1]),  
-    "MultipleLines_No phone service": st.selectbox("No Phone Service (1=Yes, 0=No)", [0, 1])  
-}  
+    return df
 
-if st.button("Predict"):  
-    # Process input  
-    input_data = preprocess_input(user_input)  
+# Streamlit UI
+st.title("Customer Churn Prediction")
 
-    # Make prediction  
-    prediction = gbm_mlp_model.predict(input_data)  
-    churn_probability = gbm_mlp_model.predict_proba(input_data)[:, 1]  
+# Input fields
+user_input = {
+    "feature_1": st.number_input("Feature 1", value=0.0),
+    "feature_2": st.number_input("Feature 2", value=0.0),
+    "feature_3": st.selectbox("Feature 3 Category", ["A", "B", "C"]),
+}
 
-    # Show result  
-    st.write(f"**Prediction:** {'Churn' if prediction[0] == 1 else 'Not Churn'}")  
-    st.write(f"**Churn Probability:** {churn_probability[0]:.2%}")  
+# Prediction button
+if st.button("Predict"):
+    input_data = preprocess_input(user_input)
+
+    # Check if model has predict method
+    if hasattr(gbm_mlp_model, "predict"):
+        prediction = gbm_mlp_model.predict(input_data)
+    else:
+        st.error("Error: The model does not support 'predict'.")
+        st.stop()
+
+    # Check if model has predict_proba method
+    if hasattr(gbm_mlp_model, "predict_proba"):
+        churn_probability = gbm_mlp_model.predict_proba(input_data)[:, 1]
+    else:
+        churn_probability = None  # Some models may not support probabilities
+
+    # Display result
+    result = "Churn" if prediction[0] == 1 else "Not Churn"
+    st.write(f"**Prediction:** {result}")
+
+    if churn_probability is not None:
+        st.write(f"**Churn Probability:** {churn_probability[0]:.2%}")
