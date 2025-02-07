@@ -5,7 +5,7 @@ import joblib
 import os
 
 # Load trained model and column order
-MODEL_PATH = "gbm_mlp_model.pkl"
+MODEL_PATH = "lgbm_mlp_model.pkl"
 COLUMNS_PATH = "columns.pkl"
 
 # Function to safely load the model
