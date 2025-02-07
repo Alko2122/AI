@@ -56,12 +56,33 @@ expected_columns = load_columns()
 if lgbm_mlp_model is None or expected_columns is None:
     st.stop()  # Stop execution if model or columns are missing
 
+# Streamlit UI
+st.title("📊 Customer Churn Prediction")
+st.write("Enter customer details to predict the likelihood of churn.")
+
+# 🔹 Define multiple input features
+st.subheader("🔹 Enter Customer Features:")
+
+user_input = {
+    "age": st.number_input("Age", min_value=18, max_value=100, value=30, step=1),
+    "monthly_charges": st.number_input("Monthly Charges ($)", min_value=0.0, value=50.0, step=0.1),
+    "total_charges": st.number_input("Total Charges ($)", min_value=0.0, value=500.0, step=0.1),
+    "contract_type": st.selectbox("Contract Type", ["Month-to-Month", "One Year", "Two Year"]),
+    "internet_service": st.selectbox("Internet Service", ["DSL", "Fiber Optic", "No Internet"]),
+    "payment_method": st.selectbox("Payment Method", ["Electronic Check", "Mailed Check", "Bank Transfer", "Credit Card"]),
+    "has_phone_service": st.radio("Phone Service", ["Yes", "No"]),
+    "has_multiple_lines": st.radio("Multiple Lines", ["Yes", "No", "No Phone Service"]),
+    "has_online_security": st.radio("Online Security", ["Yes", "No", "No Internet Service"]),
+    "has_online_backup": st.radio("Online Backup", ["Yes", "No", "No Internet Service"]),
+    "has_device_protection": st.radio("Device Protection", ["Yes", "No", "No Internet Service"]),
+}
+
 # Function to preprocess user input
 def preprocess_input(user_input):
     """Prepares input to match the trained model's feature set."""
     df = pd.DataFrame([user_input])  # Convert input to DataFrame
 
-    # Apply one-hot encoding (same as training)
+    # Convert categorical features to match training format
     df = pd.get_dummies(df)
 
     # Align columns with training data
@@ -76,18 +97,6 @@ def preprocess_input(user_input):
     df = df[expected_columns]  # Reorder columns
 
     return df
-
-# Streamlit UI
-st.title("📊 Customer Churn Prediction")
-st.write("Enter customer details to predict the likelihood of churn.")
-
-# Input fields
-st.subheader("🔹 Enter Customer Features:")
-user_input = {
-    "feature_1": st.number_input("Feature 1", value=0.0),
-    "feature_2": st.number_input("Feature 2", value=0.0),
-    "feature_3": st.selectbox("Feature 3 Category", ["A", "B", "C"]),
-}
 
 # Prediction button
 if st.button("🔍 Predict"):
