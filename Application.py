@@ -98,17 +98,25 @@ def preprocess_input(user_input):
 
     return df
 
+
 # Prediction button
 if st.button("🔍 Predict"):
     input_data = preprocess_input(user_input)
+
+    # ✅ DEBUGGING: Check input transformation
+    st.write("📌 **DEBUG MODE: Checking Input Processing**")
+    st.write("Raw User Input:", user_input)
+    st.write("Processed Input DataFrame:", input_data)
 
     if lgbm_mlp_model is not None:
         try:
             # Ensure model supports prediction
             if hasattr(lgbm_mlp_model, "predict"):
                 prediction = lgbm_mlp_model.predict(input_data)
-                result = "Churn" if prediction[0] == 1 else "Not Churn"
-                st.write(f"**Prediction:** {result}")
+                st.write("📌 **Raw Model Output:**", prediction)
+
+                result = "Churn" if prediction[0] >= 0.5 else "Not Churn"  # Ensure correct thresholding
+                st.write(f"**Final Prediction:** {result}")
 
             else:
                 st.error("Error: The model does not support 'predict'.")
@@ -116,7 +124,9 @@ if st.button("🔍 Predict"):
             # Ensure model supports probability prediction
             if hasattr(lgbm_mlp_model, "predict_proba"):
                 churn_probability = lgbm_mlp_model.predict_proba(input_data)[:, 1]
+                st.write("📌 **Predicted Churn Probability:**", churn_probability[0])
                 st.write(f"**Churn Probability:** {churn_probability[0]:.2%}")
 
         except Exception as e:
             st.error(f"An error occurred while making a prediction: {e}")
+
