@@ -4,19 +4,36 @@ import numpy as np
 import joblib
 import os
 
-# Load trained model and column order
+# ✅ Define CombinedModel before loading the model
+class CombinedModel:
+    def __init__(self, gbm, mlp):
+        self.gbm = gbm
+        self.mlp = mlp
+
+    def predict(self, X):
+        gbm_preds = self.gbm.predict(X)
+        mlp_preds = self.mlp.predict(X)
+        return (gbm_preds + mlp_preds) / 2  # Average of both predictions
+
+    def predict_proba(self, X):
+        gbm_preds = self.gbm.predict_proba(X)[:, 1]
+        mlp_preds = self.mlp.predict_proba(X)[:, 1]
+        combined_preds = (gbm_preds + mlp_preds) / 2
+        return np.column_stack([1 - combined_preds, combined_preds])  # Convert to probability format
+
+# File paths
 MODEL_PATH = "lgbm_mlp_model.pkl"
 COLUMNS_PATH = "columns.pkl"
 
 # Function to safely load the model
 def load_model():
     if os.path.exists(MODEL_PATH):
-        return joblib.load(MODEL_PATH)
+        return joblib.load(MODEL_PATH)  # ✅ Now it recognizes CombinedModel
     else:
         st.error(f"Error: Model file '{MODEL_PATH}' not found!")
         return None
 
-# Function to safely load columns.pkl
+# Function to safely load column names
 def load_columns():
     if os.path.exists(COLUMNS_PATH):
         return joblib.load(COLUMNS_PATH)
@@ -25,10 +42,10 @@ def load_columns():
         return None
 
 # Load model and columns
-gbm_mlp_model = load_model()
+lgbm_mlp_model = load_model()
 expected_columns = load_columns()
 
-if gbm_mlp_model is None or expected_columns is None:
+if lgbm_mlp_model is None or expected_columns is None:
     st.stop()  # Stop execution if model or columns are missing
 
 # Function to preprocess user input
@@ -63,15 +80,15 @@ if st.button("Predict"):
     input_data = preprocess_input(user_input)
 
     # Check if model has predict method
-    if hasattr(gbm_mlp_model, "predict"):
-        prediction = gbm_mlp_model.predict(input_data)
+    if hasattr(lgbm_mlp_model, "predict"):
+        prediction = lgbm_mlp_model.predict(input_data)
     else:
         st.error("Error: The model does not support 'predict'.")
         st.stop()
 
     # Check if model has predict_proba method
-    if hasattr(gbm_mlp_model, "predict_proba"):
-        churn_probability = gbm_mlp_model.predict_proba(input_data)[:, 1]
+    if hasattr(lgbm_mlp_model, "predict_proba"):
+        churn_probability = lgbm_mlp_model.predict_proba(input_data)[:, 1]
     else:
         churn_probability = None  # Some models may not support probabilities
 
