@@ -4,6 +4,17 @@ import numpy as np
 import joblib
 import os
 
+class CombinedModel:
+    def __init__(self, gbm, mlp):
+        self.gbm = gbm
+        self.mlp = mlp
+
+    def predict_proba(self, X):
+        gbm_preds = self.gbm.predict_proba(X)[:, 1]
+        mlp_preds = self.mlp.predict_proba(X)[:, 1]
+        combined_preds = (gbm_preds + mlp_preds) / 2
+        return np.column_stack([1 - combined_preds, combined_preds])
+
 # ✅ Define CombinedModel before loading the model
 class CombinedModel:
     def __init__(self, gbm, mlp):
