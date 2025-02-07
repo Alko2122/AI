@@ -1,10 +1,27 @@
-import streamlit as st  
-import pandas as pd  
-import joblib  
+import streamlit as st
+import joblib
+import numpy as np
 
-# Load trained models and transformation data  
-gbm_mlp_model = joblib.load("lgbm_mlp_model.pkl")  
-expected_columns = joblib.load("columns.pkl")  # Feature order used during training  
+# ✅ Define CombinedModel BEFORE loading the model
+class CombinedModel:
+    def __init__(self, gbm, mlp):
+        self.gbm = gbm
+        self.mlp = mlp
+
+    def predict_proba(self, X):
+        gbm_preds = self.gbm.predict_proba(X)[:, 1]  
+        mlp_preds = self.mlp.predict_proba(X)[:, 1]  
+        combined_preds = (gbm_preds + mlp_preds) / 2  
+        return np.column_stack([1 - combined_preds, combined_preds])  
+
+# ✅ Now load the model
+try:
+    gbm_mlp_model = joblib.load("lgbm_mlp_model.pkl")
+    expected_columns = joblib.load("columns.pkl")  
+    st.success("Model loaded successfully!")
+except Exception as e:
+    st.error(f"Error loading model: {e}")
+
 
 # Function to preprocess user input  
 def preprocess_input(user_input):  
