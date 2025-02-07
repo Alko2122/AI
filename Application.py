@@ -1,66 +1,56 @@
-import streamlit as st
-import pandas as pd
-import joblib
-import numpy as np
-from sklearn.preprocessing import StandardScaler
-from sklearn.inspection import permutation_importance
+import streamlit as st  
+import pandas as pd  
+import joblib  
 
-# Load trained models
-gbm_model = joblib.load("gbm_model.pkl")
-mlp_model = joblib.load("mlp_model.pkl")
-scaler = joblib.load("scaler.pkl")  # Ensure the same scaler is used
+# Load trained models and transformation data  
+gbm_mlp_model = joblib.load("lgbm_mlp_model.pkl")  
+expected_columns = joblib.load("columns.pkl")  # Feature order used during training  
 
-# Define input fields
-st.title("Customer Churn Prediction App")
-st.write("Enter customer details to predict whether they will churn.")
+# Function to preprocess user input  
+def preprocess_input(user_input):  
+    """Prepares input to match the trained model's feature set."""  
+    df = pd.DataFrame([user_input])  
 
-# User Inputs
-tenure = st.number_input("Tenure (months)", min_value=0, max_value=72, value=24)
-monthly_charges = st.number_input("Monthly Charges ($)", min_value=0.0, max_value=200.0, value=50.0)
-contract_type = st.selectbox("Contract Type", ["Month-to-Month", "One Year", "Two Year"])
-internet_service = st.selectbox("Internet Service", ["DSL", "Fiber Optic", "None"])
-payment_method = st.selectbox("Payment Method", ["Electronic Check", "Mailed Check", "Bank Transfer", "Credit Card"])
-paperless_billing = st.radio("Paperless Billing?", ["Yes", "No"])
+    # Apply one-hot encoding (same as training)  
+    df = pd.get_dummies(df)  
 
-# Encode categorical variables
-contract_map = {"Month-to-Month": 0, "One Year": 1, "Two Year": 2}
-internet_map = {"DSL": 0, "Fiber Optic": 1, "None": 2}
-payment_map = {"Electronic Check": 0, "Mailed Check": 1, "Bank Transfer": 2, "Credit Card": 3}
-paperless_map = {"Yes": 1, "No": 0}
+    # Ensure correct feature ordering  
+    df = df.reindex(columns=expected_columns, fill_value=0)  
 
-# Convert input to DataFrame
-user_data = pd.DataFrame({
-    "tenure": [tenure],
-    "monthly_charges": [monthly_charges],
-    "contract": [contract_map[contract_type]],
-    "internet_service": [internet_map[internet_service]],
-    "payment_method": [payment_map[payment_method]],
-    "paperless_billing": [paperless_map[paperless_billing]]
-})
+    return df  
 
-# Scale the inputs
-user_data_scaled = scaler.transform(user_data)
+# Streamlit UI  
+st.title("Customer Churn Prediction App")  
 
-# Predict using both models
-gbm_pred = gbm_model.predict_proba(user_data_scaled)[:, 1]  # Probability of churn
-mlp_pred = mlp_model.predict_proba(user_data_scaled)[:, 1]
+# Get user input  
+user_input = {  
+    "TotalCharges": st.number_input("Total Charges", min_value=0.0, step=0.01),  
+    "InternetService_Fiber optic": st.selectbox("Fiber Optic Internet", [0, 1]),  
+    "Contract_Two year": st.selectbox("Two-Year Contract", [0, 1]),  
+    "TotalServices": st.number_input("Total Services Used", min_value=0, step=1),  
+    "Contract_One year": st.selectbox("One-Year Contract", [0, 1]),  
+    "gender": st.selectbox("Gender (1=Male, 0=Female)", [0, 1]),  
+    "PaperlessBilling": st.selectbox("Paperless Billing (1=Yes, 0=No)", [0, 1]),  
+    "MultipleLines_Yes": st.selectbox("Multiple Lines (1=Yes, 0=No)", [0, 1]),  
+    "PaymentMethod_Electronic check": st.selectbox("Electronic Check Payment", [0, 1]),  
+    "Tenure_Group_Established": st.selectbox("Established Tenure Group (1=Yes, 0=No)", [0, 1]),  
+    "Partner": st.selectbox("Partner (1=Yes, 0=No)", [0, 1]),  
+    "Dependents": st.selectbox("Dependents (1=Yes, 0=No)", [0, 1]),  
+    "SeniorCitizen": st.selectbox("Senior Citizen (1=Yes, 0=No)", [0, 1]),  
+    "InternetService_No": st.selectbox("No Internet Service (1=Yes, 0=No)", [0, 1]),  
+    "PaymentMethod_Credit card (automatic)": st.selectbox("Credit Card Payment", [0, 1]),  
+    "PaymentMethod_Mailed check": st.selectbox("Mailed Check Payment", [0, 1]),  
+    "MultipleLines_No phone service": st.selectbox("No Phone Service (1=Yes, 0=No)", [0, 1])  
+}  
 
-# Ensemble Prediction (average of both models)
-final_pred = (gbm_pred + mlp_pred) / 2
+if st.button("Predict"):  
+    # Process input  
+    input_data = preprocess_input(user_input)  
 
-# Display Prediction
-st.subheader("Prediction Result:")
-if final_pred[0] > 0.5:
-    st.error(f"🔴 High Churn Risk! (Probability: {final_pred[0]:.2f})")
-else:
-    st.success(f"🟢 Customer is likely to stay. (Probability: {final_pred[0]:.2f})")
+    # Make prediction  
+    prediction = gbm_mlp_model.predict(input_data)  
+    churn_probability = gbm_mlp_model.predict_proba(input_data)[:, 1]  
 
-# Feature Importance
-if st.checkbox("Show Feature Importance"):
-    gbm_importances = pd.Series(gbm_model.feature_importances_, index=user_data.columns).sort_values(ascending=False)
-    mlp_importances = permutation_importance(mlp_model, user_data_scaled, [0], scoring="roc_auc", n_repeats=5).importances_mean
-    mlp_importances = pd.Series(mlp_importances, index=user_data.columns).sort_values(ascending=False)
-
-    # Combined importances
-    combined_importance = (gbm_importances + mlp_importances) / 2
-    st.bar_chart(combined_importance)
+    # Show result  
+    st.write(f"**Prediction:** {'Churn' if prediction[0] == 1 else 'Not Churn'}")  
+    st.write(f"**Churn Probability:** {churn_probability[0]:.2%}")  
