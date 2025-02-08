@@ -96,3 +96,18 @@ if st.button("Predict"):
         st.success("Customer is unlikely to churn.")
 
 st.write("Some additional info")
+
+# --- Load Artifacts ---
+model, scaler, columns = load_artifacts()
+
+if not all([model, scaler, columns]):
+    st.stop()
+
+st.write("Loaded columns:", columns)
+st.write(f"Model input types:{type(columns)}")
+
+# Debugging: Print the attributes of the scaler that describe the trained features
+
+numeric_features_scaler_trained_on = scaler.feature_names_in_
+
+st.write("Scaler expects features: ", numeric_features_scaler_trained_on)
