@@ -39,14 +39,8 @@ model, scaler, columns = load_artifacts()
 if not all([model, scaler, columns]):
     st.stop()
 
-st.write("Loaded columns:", columns)
-st.write(f"Model input types:{type(columns)}")
-
-# --- Debugging: Print the attributes of the scaler that describe the trained features
-
-numeric_features_scaler_trained_on = scaler.feature_names_in_
-
-st.write("Scaler expects features: ", numeric_features_scaler_trained_on)
+# Debugging - Print user_df BEFORE scaling
+st.write("Loaded Columns", columns)
 
 # --- Side Panel for User Input ---
 st.sidebar.header("User Input")
@@ -66,6 +60,8 @@ multiple_lines = st.sidebar.selectbox("Multiple Lines", ["No", "Yes", "No phone 
 tenure_group_established = st.sidebar.selectbox("Tenure Group Established", [0, 1])
 
 # 2. Create a DataFrame from User Inputs - convert to what the training data expects
+
+# New code to create an *empty* DataFrame with the correct column names
 user_data = {
     "gender": [1 if gender == "Male" else 0],
     "SeniorCitizen": [senior_citizen],
@@ -85,21 +81,23 @@ user_data = {
     "MultipleLines_Yes": [1 if multiple_lines == "Yes" else 0],
     "Tenure_Group_Established": [tenure_group_established]
 }
-
 user_df = pd.DataFrame(user_data)
 
-# 3. Ensure User DataFrame has same columns and order as trained model (Important!)
+# 3. Reindex the DataFrame to match training data. Make sure it has all columns.
 user_df = user_df.reindex(columns=columns, fill_value=0)
 
-st.write("User data", user_df)
+# 4. Scale the numerical values using trained scaler
 
-# 4. Preprocess the User Input, scale all, not just numeric
-#numeric_cols = ["TotalCharges", "TotalServices"]
-#user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
+numeric_cols = ["TotalCharges", "TotalServices"]
+
+#The problem may be occurring from here, so you need to use .to_numpy() to make it as what the data type the scaler expects
+user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
+
 
 # Make prediction
 if st.button("Predict"):
     try:
+
         y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
 
         st.write("Churn Probability:", y_proba)
