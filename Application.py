@@ -39,6 +39,9 @@ model, scaler, columns = load_artifacts()
 if not all([model, scaler, columns]):
     st.stop()
 
+# --- Debugging: Print loaded columns ---
+st.write("Loaded columns:", columns)
+
 # --- Side Panel for User Input ---
 st.sidebar.header("User Input")
 
@@ -56,13 +59,13 @@ payment_method = st.sidebar.selectbox("Payment Method", ["Electronic check", "Ma
 multiple_lines = st.sidebar.selectbox("Multiple Lines", ["No", "Yes", "No phone service"])
 tenure_group_established = st.sidebar.selectbox("Tenure Group Established", [0, 1])
 
-# 2. Create a DataFrame from User Inputs - with all columns and correct types
+# 2. Create a DataFrame from User Inputs - with correct types
 user_data = {
-    "gender": [gender == "Male"],
+    "gender": [1 if gender == "Male" else 0], # Convert to numeric (0 or 1)
     "SeniorCitizen": [senior_citizen],
-    "Partner": [partner == "Yes"],
-    "Dependents": [dependents == "Yes"],
-    "PaperlessBilling": [paperless_billing == "Yes"],
+    "Partner": [1 if partner == "Yes" else 0], # Convert to numeric (0 or 1)
+    "Dependents": [1 if dependents == "Yes" else 0], # Convert to numeric (0 or 1)
+    "PaperlessBilling": [1 if paperless_billing == "Yes" else 0], # Convert to numeric (0 or 1)
     "TotalCharges": [total_charges],
     "TotalServices": [total_services],
     "InternetService_Fiber optic": [1 if internet_service == "Fiber optic" else 0],
@@ -81,12 +84,22 @@ user_df = pd.DataFrame(user_data)
 
 # 3. Ensure User DataFrame has same columns and order as trained model (Important!)
 user_df = user_df.reindex(columns=columns, fill_value=0)
-numeric_cols = ["TotalCharges", "TotalServices"]
+
+# Debugging - Print user_df BEFORE scaling
+st.write("User Data before Scaling:", user_df)
 
 # 4. Preprocess the User Input
+numeric_cols = ["TotalCharges", "TotalServices"]
+
 user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
+
+#Verify user df after scaling
+
+st.write("user_df after scaling", user_df)
+
 # Make prediction
 if st.button("Predict"):
+
     y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
 
     st.write("Churn Probability:", y_proba)
