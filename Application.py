@@ -1,10 +1,20 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib  # For loading the model and scaler
+import joblib
+from sklearn.preprocessing import StandardScaler
 
-# --- Configuration ---
-PAGE_TITLE = "Customer Churn Prediction"
+# --- Define the CombinedModel class here ---
+class CombinedModel:
+    def __init__(self, gbm, mlp):
+        self.gbm = gbm
+        self.mlp = mlp
+
+    def predict_proba(self, X):
+        gbm_preds = self.gbm.predict_proba(X)[:, 1]
+        mlp_preds = self.mlp.predict_proba(X)[:, 1]
+        combined_preds = (gbm_preds + mlp_preds) / 2
+        return np.column_stack([1 - combined_preds, combined_preds])
 
 # --- Functions ---
 def load_artifacts():
@@ -18,15 +28,14 @@ def load_artifacts():
         return None, None, None
 
 # --- App Layout ---
-st.set_page_config(page_title=PAGE_TITLE, layout="wide")
-
-st.title(PAGE_TITLE)
+st.set_page_config(page_title="Customer Churn Prediction", layout="wide")
+st.title("Customer Churn Prediction")
 
 # --- Load Artifacts ---
 model, scaler, columns = load_artifacts()
 
 if not all([model, scaler, columns]):
-    st.stop()  # Halt if artifacts are missing
+    st.stop()
 
 # --- Side Panel for User Input ---
 st.sidebar.header("User Input")
