@@ -56,7 +56,7 @@ payment_method = st.sidebar.selectbox("Payment Method", ["Electronic check", "Ma
 multiple_lines = st.sidebar.selectbox("Multiple Lines", ["No", "Yes", "No phone service"])
 tenure_group_established = st.sidebar.selectbox("Tenure Group Established", [0, 1])
 
-# 2. Create a DataFrame from User Inputs
+# 2. Create a DataFrame from User Inputs (Unscaled)
 user_data = {
     "gender": [gender],
     "SeniorCitizen": [senior_citizen],
@@ -78,35 +78,25 @@ user_data = {
 }
 user_df = pd.DataFrame(user_data)
 
-# 3. Ensure User DataFrame has same columns and order as trained model (Important!)
+# 3. Ensure User DataFrame has same columns as training data (Important!)
 user_df = user_df.reindex(columns=columns, fill_value=0)
 
-# 4. Preprocess the User Input
-
-# Scale numeric features
+# 4. Now, create a *new* DataFrame with only the *numeric* columns, in the right order
 numeric_cols = ["TotalCharges", "TotalServices"]
-user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
+user_df_scaled = pd.DataFrame(columns=columns)
 
-# Verify X_scaled has right columns before using model:
-missing_cols = set(columns) - set(user_df.columns)
-if missing_cols:
-    st.error(f"Missing columns: {missing_cols}")
-else:
-    extra_cols = set(user_df.columns) - set(columns)
-    if extra_cols:
-        st.error(f"Extra columns: {extra_cols}")
-
+# Iterate over and transform.
+user_df_scaled[numeric_cols] = scaler.transform(user_df[numeric_cols])
+# 5. Now, the Model will work
 # Make prediction
 if st.button("Predict"):
-    if missing_cols or extra_cols:
-        st.error("Fix the column mismatch before predicting.")
-    else:
-        y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
+    # Now, the transform was used on the data set to get only the selected columns
+    y_proba = model.predict_proba(user_df_scaled)[0, 1]  # Get churn probability
 
-        st.write("Churn Probability:", y_proba)
-        if y_proba > 0.5:
-            st.warning("Customer is likely to churn.")
-        else:
-            st.success("Customer is unlikely to churn.")
+    st.write("Churn Probability:", y_proba)
+    if y_proba > 0.5:
+        st.warning("Customer is likely to churn.")
+    else:
+        st.success("Customer is unlikely to churn.")
 
 st.write("Some additional info")
