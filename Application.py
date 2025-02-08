@@ -56,13 +56,13 @@ payment_method = st.sidebar.selectbox("Payment Method", ["Electronic check", "Ma
 multiple_lines = st.sidebar.selectbox("Multiple Lines", ["No", "Yes", "No phone service"])
 tenure_group_established = st.sidebar.selectbox("Tenure Group Established", [0, 1])
 
-# 2. Create a DataFrame from User Inputs (Unscaled)
+# 2. Create a DataFrame from User Inputs - with all columns and correct types
 user_data = {
-    "gender": [gender],
+    "gender": [gender == "Male"],
     "SeniorCitizen": [senior_citizen],
-    "Partner": [partner],
-    "Dependents": [dependents],
-    "PaperlessBilling": [paperless_billing],
+    "Partner": [partner == "Yes"],
+    "Dependents": [dependents == "Yes"],
+    "PaperlessBilling": [paperless_billing == "Yes"],
     "TotalCharges": [total_charges],
     "TotalServices": [total_services],
     "InternetService_Fiber optic": [1 if internet_service == "Fiber optic" else 0],
@@ -76,22 +76,18 @@ user_data = {
     "MultipleLines_Yes": [1 if multiple_lines == "Yes" else 0],
     "Tenure_Group_Established": [tenure_group_established]
 }
+
 user_df = pd.DataFrame(user_data)
 
-# 3. Ensure User DataFrame has same columns as training data (Important!)
+# 3. Ensure User DataFrame has same columns and order as trained model (Important!)
 user_df = user_df.reindex(columns=columns, fill_value=0)
-
-# 4. Now, create a *new* DataFrame with only the *numeric* columns, in the right order
 numeric_cols = ["TotalCharges", "TotalServices"]
-user_df_scaled = pd.DataFrame(columns=columns)
 
-# Iterate over and transform.
-user_df_scaled[numeric_cols] = scaler.transform(user_df[numeric_cols])
-# 5. Now, the Model will work
+# 4. Preprocess the User Input
+user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
 # Make prediction
 if st.button("Predict"):
-    # Now, the transform was used on the data set to get only the selected columns
-    y_proba = model.predict_proba(user_df_scaled)[0, 1]  # Get churn probability
+    y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
 
     st.write("Churn Probability:", y_proba)
     if y_proba > 0.5:
