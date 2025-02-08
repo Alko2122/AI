@@ -39,11 +39,19 @@ model, scaler, columns = load_artifacts()
 if not all([model, scaler, columns]):
     st.stop()
 
-# Print model and columns
+st.write("Loaded columns:", columns)
+st.write(f"Model input types:{type(columns)}")
+
+# --- Debugging: Print the attributes of the scaler that describe the trained features
+
+numeric_features_scaler_trained_on = scaler.feature_names_in_
+
+st.write("Scaler expects features: ", numeric_features_scaler_trained_on)
 
 # --- Side Panel for User Input ---
 st.sidebar.header("User Input")
 
+# 1. Gather Input Features
 gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
 senior_citizen = st.sidebar.selectbox("Senior Citizen", [0, 1])
 partner = st.sidebar.selectbox("Partner", ["Yes", "No"])
@@ -57,50 +65,49 @@ payment_method = st.sidebar.selectbox("Payment Method", ["Electronic check", "Ma
 multiple_lines = st.sidebar.selectbox("Multiple Lines", ["No", "Yes", "No phone service"])
 tenure_group_established = st.sidebar.selectbox("Tenure Group Established", [0, 1])
 
-# 2. Create a DataFrame from User Inputs - with all columns and correct types
-user_data = {}
-for col in columns:
-        user_data[col] = [0]
-
-user_data["gender"] = [1 if gender == "Male" else 0]
-user_data["SeniorCitizen"] = [senior_citizen]
-user_data["Partner"] = [1 if partner == "Yes" else 0]
-user_data["Dependents"] = [1 if dependents == "Yes" else 0]
-user_data["PaperlessBilling"] = [1 if paperless_billing == "Yes" else 0]
-user_data["TotalCharges"] = [total_charges]
-user_data["TotalServices"] = [total_services]
-user_data["InternetService_Fiber optic"] = [1 if internet_service == "Fiber optic" else 0]
-user_data["InternetService_No"] = [1 if internet_service == "No" else 0]
-user_data["Contract_One year"] = [1 if contract == "One year" else 0]
-user_data["Contract_Two year"] = [1 if contract == "Two year" else 0]
-user_data["PaymentMethod_Credit card (automatic)"] = [1 if payment_method == "Credit card (automatic)" else 0]
-user_data["PaymentMethod_Electronic check"] = [1 if payment_method == "Electronic check" else 0]
-user_data["PaymentMethod_Mailed check"] = [1 if payment_method == "Mailed check" else 0]
-user_data["MultipleLines_No phone service"] = [1 if multiple_lines == "No phone service" else 0]
-user_data["MultipleLines_Yes"] = [1 if multiple_lines == "Yes" else 0]
-user_data["Tenure_Group_Established"] = [tenure_group_established]
+# 2. Create a DataFrame from User Inputs - convert to what the training data expects
+user_data = {
+    "gender": [1 if gender == "Male" else 0],
+    "SeniorCitizen": [senior_citizen],
+    "Partner": [1 if partner == "Yes" else 0],
+    "Dependents": [1 if dependents == "Yes" else 0],
+    "PaperlessBilling": [1 if paperless_billing == "Yes" else 0],
+    "TotalCharges": [total_charges],
+    "TotalServices": [total_services],
+    "InternetService_Fiber optic": [1 if internet_service == "Fiber optic" else 0],
+    "InternetService_No": [1 if internet_service == "No" else 0],
+    "Contract_One year": [1 if contract == "One year" else 0],
+    "Contract_Two year": [1 if contract == "Two year" else 0],
+    "PaymentMethod_Credit card (automatic)": [1 if payment_method == "Credit card (automatic)" else 0],
+    "PaymentMethod_Electronic check": [1 if payment_method == "Electronic check" else 0],
+    "PaymentMethod_Mailed check": [1 if payment_method == "Mailed check" else 0],
+    "MultipleLines_No phone service": [1 if multiple_lines == "No phone service" else 0],
+    "MultipleLines_Yes": [1 if multiple_lines == "Yes" else 0],
+    "Tenure_Group_Established": [tenure_group_established]
+}
 
 user_df = pd.DataFrame(user_data)
 
 # 3. Ensure User DataFrame has same columns and order as trained model (Important!)
+user_df = user_df.reindex(columns=columns, fill_value=0)
 
-user_df = user_df[columns] # Use "columns" to select and preserve order
-# Verify
+st.write("User data", user_df)
 
 # 4. Preprocess the User Input, scale all, not just numeric
-numeric_cols = ["TotalCharges", "TotalServices"]
-
-user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
+#numeric_cols = ["TotalCharges", "TotalServices"]
+#user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
 
 # Make prediction
 if st.button("Predict"):
+    try:
+        y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
 
-    y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
-
-    st.write("Churn Probability:", y_proba)
-    if y_proba > 0.5:
-        st.warning("Customer is likely to churn.")
-    else:
-        st.success("Customer is unlikely to churn.")
+        st.write("Churn Probability:", y_proba)
+        if y_proba > 0.5:
+            st.warning("Customer is likely to churn.")
+        else:
+            st.success("Customer is unlikely to churn.")
+    except Exception as e:
+        st.error(f"Prediction error: {e}")
 
 st.write("Some additional info")
