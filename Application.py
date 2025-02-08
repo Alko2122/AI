@@ -94,7 +94,7 @@ if submitted:
         'Partner': 1 if partner == "Yes" else 0,
         'Dependents': 1 if dependents == "Yes" else 0,
         'PaperlessBilling': 1 if paperless_billing == "Yes" else 0,
-        'TotalCharges': total_charges,  # Using direct input now
+        'TotalCharges': total_charges,
         'TotalServices': sum([
             phone_service == "Yes",
             internet_service != "No",
@@ -144,18 +144,83 @@ if submitted:
     
     # Display gauge chart for probability
     st.progress(probability)
+
+    # Show prediction explanation
+    st.subheader("Prediction Explanation")
     
-    # Show feature importance notification
-    st.info("""
-    Key factors affecting this prediction:
-    - Contract Type (Month-to-month customers have higher churn risk)
-    - Internet Service (Fiber optic users show different patterns)
-    - Payment Method (Electronic check users have higher churn risk)
-    - Tenure (Established customers tend to be more stable)
-    """)
+    # Calculate feature contributions
+    feature_importance = {
+        'Total Charges': (total_charges, 2904),
+        'Total Services': (data['TotalServices'], 510),
+        'Internet Service': ('Fiber optic' if data['InternetService_Fiber optic'] else 'Other', 220),
+        'Paperless Billing': ('Yes' if data['PaperlessBilling'] else 'No', 254),
+        'Payment Method': (payment_method, 199),
+        'Contract': (contract, 163),
+        'Demographics': (f"{'Senior' if senior_citizen=='Yes' else 'Non-senior'}, {'With' if partner=='Yes' else 'Without'} partner", 186)
+    }
     
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.info(f"""
+        1. **Total Charges** (Highest Impact): ${total_charges:.2f}
+        2. **Service Usage** (Total Services: {data['TotalServices']})
+        3. **Billing Preferences**: {paperless_billing}, {payment_method}
+        4. **Internet Service**: {internet_service}
+        5. **Contract Type**: {contract}
+        6. **Customer Profile**: {senior_citizen}, {partner}, {dependents}
+        """)
+    
+    with col2:
+        st.write("Relative Feature Importance:")
+        importance_df = pd.DataFrame([
+            ('Total Charges', 2904),
+            ('Total Services', 510),
+            ('Demographics', 370),
+            ('Paperless Billing', 254),
+            ('Internet Service', 220),
+            ('Contract Type', 163)
+        ], columns=['Feature', 'Importance'])
+        
+        st.bar_chart(importance_df.set_index('Feature'))
+
+    # Show risk factors
+    high_risk_factors = []
+    low_risk_factors = []
+    
+    # Check for high-risk factors
+    if data['InternetService_Fiber optic']:
+        high_risk_factors.append("Fiber optic service")
+    if payment_method == "Electronic check":
+        high_risk_factors.append("Electronic check payment")
+    if contract == "Month-to-month":
+        high_risk_factors.append("Month-to-month contract")
+    if data['TotalServices'] > 2:
+        high_risk_factors.append("Multiple services")
+    if total_charges > 1000:  # Adjust threshold as needed
+        high_risk_factors.append("High total charges")
+    
+    # Check for low-risk factors
+    if contract in ["One year", "Two year"]:
+        low_risk_factors.append("Long-term contract")
+    if payment_method in ["Credit card (automatic)", "Bank transfer (automatic)"]:
+        low_risk_factors.append("Automatic payment method")
+    if data['Tenure_Group_Established']:
+        low_risk_factors.append("Established customer")
+    if total_charges < 500:  # Adjust threshold as needed
+        low_risk_factors.append("Low total charges")
+    
+    # Display risk factors
+    col1, col2 = st.columns(2)
+    with col1:
+        if high_risk_factors:
+            st.warning("**Higher Risk Factors:**\n- " + "\n- ".join(high_risk_factors))
+    with col2:
+        if low_risk_factors:
+            st.success("**Stability Factors:**\n- " + "\n- ".join(low_risk_factors))
+
     # Show input summary
-    with st.expander("View customer profile"):
+    with st.expander("View Customer Profile Details"):
         col1, col2 = st.columns(2)
         with col1:
             st.write("**Services:**")
@@ -179,9 +244,11 @@ with st.expander("Model Information"):
     - ROC-AUC: 0.829
     - F1-Score: 0.597
     
-    Note: Total Charges can be affected by:
-    - Previous rate changes
-    - Prorated charges
-    - Service changes over time
-    - Special offers or discounts
+    The model considers multiple factors with varying levels of importance:
+    1. Total Charges (2904) - Highest impact
+    2. Total Services (510)
+    3. Demographics (370)
+    4. Paperless Billing (254)
+    5. Internet Service Type (220)
+    6. Contract Type (163)
     """)
