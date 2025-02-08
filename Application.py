@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
-from sklearn.preprocessing import StandardScaler
+import joblib  # For loading the model and scaler
 
 # --- Define the CombinedModel class here ---
 class CombinedModel:
@@ -107,6 +106,3 @@ if st.button("Predict"):
             st.success("Customer is unlikely to churn.")
 
 st.write("Some additional info")
-
-# Example
-#     python -m streamlit run app.py
