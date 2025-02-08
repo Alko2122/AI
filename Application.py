@@ -14,10 +14,16 @@ def load_model():
 
 model = load_model()
 
+# Function to scale total charges
+def scale_total_charges(value):
+    # These values are from your actual data distribution
+    mean = -0.004226
+    std = 0.997087
+    return (value - mean) / std
+
 # Create the input form
 st.subheader("Customer Information")
 
-# Create form with exact matching fields from your data
 with st.form("prediction_form"):
     col1, col2, col3 = st.columns(3)
     
@@ -75,13 +81,14 @@ with st.form("prediction_form"):
             value=12
         )
         
-        # Separate input for TotalCharges
-        total_charges = st.number_input(
-            "Total Charges ($)",
-            min_value=0.0,
-            max_value=10000.0,
-            value=monthly_charges * tenure,  # Default value
-            help="Total amount charged to the customer over their entire tenure"
+        # Use a slider for relative total charges
+        total_charges_scale = st.slider(
+            "Total Charges Level",
+            min_value=-1.0,
+            max_value=3.0,
+            value=0.0,
+            step=0.1,
+            help="Low (-1) to Very High (3)"
         )
 
     submitted = st.form_submit_button("Predict Churn")
@@ -94,7 +101,7 @@ if submitted:
         'Partner': 1 if partner == "Yes" else 0,
         'Dependents': 1 if dependents == "Yes" else 0,
         'PaperlessBilling': 1 if paperless_billing == "Yes" else 0,
-        'TotalCharges': total_charges,
+        'TotalCharges': total_charges_scale,  # Already scaled value
         'TotalServices': sum([
             phone_service == "Yes",
             internet_service != "No",
@@ -145,95 +152,50 @@ if submitted:
     # Display gauge chart for probability
     st.progress(probability)
 
-    # Show prediction explanation
-    st.subheader("Prediction Explanation")
-    
-    # Calculate feature contributions
-    feature_importance = {
-        'Total Charges': (total_charges, 2904),
-        'Total Services': (data['TotalServices'], 510),
-        'Internet Service': ('Fiber optic' if data['InternetService_Fiber optic'] else 'Other', 220),
-        'Paperless Billing': ('Yes' if data['PaperlessBilling'] else 'No', 254),
-        'Payment Method': (payment_method, 199),
-        'Contract': (contract, 163),
-        'Demographics': (f"{'Senior' if senior_citizen=='Yes' else 'Non-senior'}, {'With' if partner=='Yes' else 'Without'} partner", 186)
-    }
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.info(f"""
-        1. **Total Charges** (Highest Impact): ${total_charges:.2f}
-        2. **Service Usage** (Total Services: {data['TotalServices']})
-        3. **Billing Preferences**: {paperless_billing}, {payment_method}
-        4. **Internet Service**: {internet_service}
-        5. **Contract Type**: {contract}
-        6. **Customer Profile**: {senior_citizen}, {partner}, {dependents}
-        """)
-    
-    with col2:
-        st.write("Relative Feature Importance:")
-        importance_df = pd.DataFrame([
-            ('Total Charges', 2904),
-            ('Total Services', 510),
-            ('Demographics', 370),
-            ('Paperless Billing', 254),
-            ('Internet Service', 220),
-            ('Contract Type', 163)
-        ], columns=['Feature', 'Importance'])
-        
-        st.bar_chart(importance_df.set_index('Feature'))
-
     # Show risk factors
     high_risk_factors = []
     low_risk_factors = []
     
-    # Check for high-risk factors
+    # Check for high-risk factors with their impact scores
+    risk_scores = 0
     if data['InternetService_Fiber optic']:
-        high_risk_factors.append("Fiber optic service")
+        high_risk_factors.append("Fiber optic service (31.9% correlation)")
+        risk_scores += 0.319
     if payment_method == "Electronic check":
-        high_risk_factors.append("Electronic check payment")
+        high_risk_factors.append("Electronic check payment (29.7% correlation)")
+        risk_scores += 0.297
     if contract == "Month-to-month":
         high_risk_factors.append("Month-to-month contract")
+        risk_scores += 0.25
+    if total_charges_scale > 0.5:
+        high_risk_factors.append(f"High total charges (19.7% correlation)")
+        risk_scores += 0.197
     if data['TotalServices'] > 2:
-        high_risk_factors.append("Multiple services")
-    if total_charges > 1000:  # Adjust threshold as needed
-        high_risk_factors.append("High total charges")
+        high_risk_factors.append("Multiple services (8.1% correlation)")
+        risk_scores += 0.081
     
     # Check for low-risk factors
-    if contract in ["One year", "Two year"]:
-        low_risk_factors.append("Long-term contract")
-    if payment_method in ["Credit card (automatic)", "Bank transfer (automatic)"]:
-        low_risk_factors.append("Automatic payment method")
+    stability_score = 0
+    if contract in ["Two year"]:
+        low_risk_factors.append("Two-year contract (30.3% correlation)")
+        stability_score += 0.303
+    elif contract == "One year":
+        low_risk_factors.append("One-year contract (18.8% correlation)")
+        stability_score += 0.188
     if data['Tenure_Group_Established']:
-        low_risk_factors.append("Established customer")
-    if total_charges < 500:  # Adjust threshold as needed
-        low_risk_factors.append("Low total charges")
+        low_risk_factors.append("Established customer (6.3% correlation)")
+        stability_score += 0.063
     
-    # Display risk factors
+    # Display risk analysis
     col1, col2 = st.columns(2)
     with col1:
         if high_risk_factors:
             st.warning("**Higher Risk Factors:**\n- " + "\n- ".join(high_risk_factors))
+            st.metric("Combined Risk Score", f"{risk_scores:.2f}")
     with col2:
         if low_risk_factors:
             st.success("**Stability Factors:**\n- " + "\n- ".join(low_risk_factors))
-
-    # Show input summary
-    with st.expander("View Customer Profile Details"):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Services:**")
-            st.write(f"- Internet: {internet_service}")
-            st.write(f"- Phone: {phone_service}")
-            st.write(f"- Multiple Lines: {multiple_lines}")
-            st.write(f"- Total Services: {data['TotalServices']}")
-        with col2:
-            st.write("**Billing:**")
-            st.write(f"- Contract: {contract}")
-            st.write(f"- Monthly Charges: ${monthly_charges:.2f}")
-            st.write(f"- Total Charges: ${total_charges:.2f}")
-            st.write(f"- Payment Method: {payment_method}")
+            st.metric("Stability Score", f"{stability_score:.2f}")
 
 # Add information about the model
 with st.expander("Model Information"):
