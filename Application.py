@@ -19,7 +19,7 @@ st.subheader("Customer Information")
 
 # Create form with exact matching fields from your data
 with st.form("prediction_form"):
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         # Basic Information
@@ -27,11 +27,17 @@ with st.form("prediction_form"):
         senior_citizen = st.selectbox("Senior Citizen", ["No", "Yes"])
         partner = st.selectbox("Partner", ["No", "Yes"])
         dependents = st.selectbox("Dependents", ["No", "Yes"])
-        
-        # Internet Service
+    
+    with col2:
+        # Services
         internet_service = st.selectbox(
             "Internet Service", 
             ["DSL", "Fiber optic", "No"]
+        )
+        phone_service = st.selectbox("Phone Service", ["No", "Yes"])
+        multiple_lines = st.selectbox(
+            "Multiple Lines",
+            ["No", "Yes", "No phone service"]
         )
         
         # Contract
@@ -40,14 +46,7 @@ with st.form("prediction_form"):
             ["Month-to-month", "One year", "Two year"]
         )
         
-    with col2:
-        # Services
-        phone_service = st.selectbox("Phone Service", ["No", "Yes"])
-        multiple_lines = st.selectbox(
-            "Multiple Lines",
-            ["No", "Yes", "No phone service"]
-        )
-        
+    with col3:
         # Billing
         paperless_billing = st.selectbox("Paperless Billing", ["No", "Yes"])
         payment_method = st.selectbox(
@@ -60,12 +59,13 @@ with st.form("prediction_form"):
             ]
         )
         
-        # Charges
+        # Charges and Tenure
         monthly_charges = st.number_input(
             "Monthly Charges ($)",
             min_value=0.0,
             max_value=1000.0,
-            value=50.0
+            value=50.0,
+            step=5.0
         )
         
         tenure = st.number_input(
@@ -73,6 +73,15 @@ with st.form("prediction_form"):
             min_value=0,
             max_value=100,
             value=12
+        )
+        
+        # Separate input for TotalCharges
+        total_charges = st.number_input(
+            "Total Charges ($)",
+            min_value=0.0,
+            max_value=10000.0,
+            value=monthly_charges * tenure,  # Default value
+            help="Total amount charged to the customer over their entire tenure"
         )
 
     submitted = st.form_submit_button("Predict Churn")
@@ -85,7 +94,7 @@ if submitted:
         'Partner': 1 if partner == "Yes" else 0,
         'Dependents': 1 if dependents == "Yes" else 0,
         'PaperlessBilling': 1 if paperless_billing == "Yes" else 0,
-        'TotalCharges': monthly_charges * tenure,  # Approximation
+        'TotalCharges': total_charges,  # Using direct input now
         'TotalServices': sum([
             phone_service == "Yes",
             internet_service != "No",
@@ -100,7 +109,7 @@ if submitted:
         'PaymentMethod_Mailed check': 1 if payment_method == "Mailed check" else 0,
         'MultipleLines_No phone service': 1 if multiple_lines == "No phone service" else 0,
         'MultipleLines_Yes': 1 if multiple_lines == "Yes" else 0,
-        'Tenure_Group_Established': 1 if tenure > 12 else 0  # Assuming established means >12 months
+        'Tenure_Group_Established': 1 if tenure > 12 else 0
     }
     
     # Create DataFrame with exact column order
@@ -136,9 +145,30 @@ if submitted:
     # Display gauge chart for probability
     st.progress(probability)
     
-    # Show feature values used
-    with st.expander("View processed features"):
-        st.dataframe(input_df)
+    # Show feature importance notification
+    st.info("""
+    Key factors affecting this prediction:
+    - Contract Type (Month-to-month customers have higher churn risk)
+    - Internet Service (Fiber optic users show different patterns)
+    - Payment Method (Electronic check users have higher churn risk)
+    - Tenure (Established customers tend to be more stable)
+    """)
+    
+    # Show input summary
+    with st.expander("View customer profile"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Services:**")
+            st.write(f"- Internet: {internet_service}")
+            st.write(f"- Phone: {phone_service}")
+            st.write(f"- Multiple Lines: {multiple_lines}")
+            st.write(f"- Total Services: {data['TotalServices']}")
+        with col2:
+            st.write("**Billing:**")
+            st.write(f"- Contract: {contract}")
+            st.write(f"- Monthly Charges: ${monthly_charges:.2f}")
+            st.write(f"- Total Charges: ${total_charges:.2f}")
+            st.write(f"- Payment Method: {payment_method}")
 
 # Add information about the model
 with st.expander("Model Information"):
@@ -148,4 +178,10 @@ with st.expander("Model Information"):
     - Accuracy: 0.786
     - ROC-AUC: 0.829
     - F1-Score: 0.597
+    
+    Note: Total Charges can be affected by:
+    - Previous rate changes
+    - Prorated charges
+    - Service changes over time
+    - Special offers or discounts
     """)
