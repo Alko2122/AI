@@ -1,0 +1,17 @@
+gender
+SeniorCitizen
+Partner
+Dependents
+PaperlessBilling
+TotalCharges
+TotalServices
+InternetService_Fiber optic
+InternetService_No
+Contract_One year
+Contract_Two year
+PaymentMethod_Credit card (automatic)
+PaymentMethod_Electronic check
+PaymentMethod_Mailed check
+MultipleLines_No phone service
+MultipleLines_Yes
+Tenure_Group_Established
