@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore")
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -39,33 +41,30 @@ model, scaler, columns = load_artifacts()
 if not all([model, scaler, columns]):
     st.stop()
 
-# --- Debugging: Print loaded columns ---
-st.write("Loaded columns:", columns)
 
 # --- Side Panel for User Input ---
 st.sidebar.header("User Input")
 
-# 1. Gather Input Features
 gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
 senior_citizen = st.sidebar.selectbox("Senior Citizen", [0, 1])
 partner = st.sidebar.selectbox("Partner", ["Yes", "No"])
 dependents = st.sidebar.selectbox("Dependents", ["Yes", "No"])
 paperless_billing = st.sidebar.selectbox("Paperless Billing", ["Yes", "No"])
 total_charges = st.sidebar.number_input("Total Charges", min_value=0.0, value=1000.0)
-total_services = st.sidebar.slider("Total Services", min_value=0, max_value=6, value=3)  # Assuming a max of 6 based on notebook
+total_services = st.sidebar.slider("Total Services", min_value=0, max_value=6, value=3)
 internet_service = st.sidebar.selectbox("Internet Service", ["Fiber optic", "DSL", "No"])
 contract = st.sidebar.selectbox("Contract", ["Month-to-month", "One year", "Two year"])
 payment_method = st.sidebar.selectbox("Payment Method", ["Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"])
 multiple_lines = st.sidebar.selectbox("Multiple Lines", ["No", "Yes", "No phone service"])
 tenure_group_established = st.sidebar.selectbox("Tenure Group Established", [0, 1])
 
-# 2. Create a DataFrame from User Inputs - with correct types
+
 user_data = {
-    "gender": [1 if gender == "Male" else 0], # Convert to numeric (0 or 1)
+    "gender": [1 if gender == "Male" else 0],
     "SeniorCitizen": [senior_citizen],
-    "Partner": [1 if partner == "Yes" else 0], # Convert to numeric (0 or 1)
-    "Dependents": [1 if dependents == "Yes" else 0], # Convert to numeric (0 or 1)
-    "PaperlessBilling": [1 if paperless_billing == "Yes" else 0], # Convert to numeric (0 or 1)
+    "Partner": [1 if partner == "Yes" else 0],
+    "Dependents": [1 if dependents == "Yes" else 0],
+    "PaperlessBilling": [1 if paperless_billing == "Yes" else 0],
     "TotalCharges": [total_charges],
     "TotalServices": [total_services],
     "InternetService_Fiber optic": [1 if internet_service == "Fiber optic" else 0],
@@ -79,25 +78,13 @@ user_data = {
     "MultipleLines_Yes": [1 if multiple_lines == "Yes" else 0],
     "Tenure_Group_Established": [tenure_group_established]
 }
-
 user_df = pd.DataFrame(user_data)
-
-# 3. Ensure User DataFrame has same columns and order as trained model (Important!)
 user_df = user_df.reindex(columns=columns, fill_value=0)
 
-# Debugging - Print user_df BEFORE scaling
-st.write("User Data before Scaling:", user_df)
 
-# 4. Preprocess the User Input
 numeric_cols = ["TotalCharges", "TotalServices"]
-
 user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
 
-#Verify user df after scaling
-
-st.write("user_df after scaling", user_df)
-
-# Make prediction
 if st.button("Predict"):
 
     y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
