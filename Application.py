@@ -1,7 +1,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib  # For loading the model and scaler
+import joblib
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.neural_network import MLPClassifier
 
 # --- Define the CombinedModel class here ---
 class CombinedModel:
@@ -80,23 +83,23 @@ user_df = user_df.reindex(columns=columns, fill_value=0)
 
 # 4. Preprocess the User Input
 
-# Scale numeric features
-user_df[["TotalCharges", "TotalServices"]] = scaler.transform(user_df[["TotalCharges", "TotalServices"]])
+# Scale *ALL* features
+user_df = scaler.transform(user_df)
 
 # Verify X_scaled has right columns before using model:
-missing_cols = set(columns) - set(user_df.columns)
-if missing_cols:
-    st.error(f"Missing columns: {missing_cols}")
-else:
-    extra_cols = set(user_df.columns) - set(columns)
-    if extra_cols:
-        st.error(f"Extra columns: {extra_cols}")
+# missing_cols = set(columns) - set(user_df.columns) # Not needed anymore
+# if missing_cols:
+#     st.error(f"Missing columns: {missing_cols}")
+# else:
+#     extra_cols = set(user_df.columns) - set(columns)
+#     if extra_cols:
+#         st.error(f"Extra columns: {extra_cols}")
 
 # Make prediction
 if st.button("Predict"):
-    if missing_cols or extra_cols:
-        st.error("Fix the column mismatch before predicting.")
-    else:
+    # if missing_cols or extra_cols:
+    #     st.error("Fix the column mismatch before predicting.")
+    # else:
         y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
 
         st.write("Churn Probability:", y_proba)
