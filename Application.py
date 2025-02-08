@@ -91,19 +91,17 @@ user_df = pd.DataFrame(user_data)
 # 3. Ensure User DataFrame has same columns and order as trained model (Important!)
 user_df = user_df.reindex(columns=columns, fill_value=0)
 
-# Debugging - Print user_df BEFORE scaling
-st.write("User Data before Scaling:", user_df)
+st.write("User data", user_df)
 
 # 4. Preprocess the User Input
 numeric_cols = ["TotalCharges", "TotalServices"]
 
 user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
-# Verify user df after scaling
 
-st.write("user_df after scaling", user_df)
 
 # Make prediction
 if st.button("Predict"):
+
     y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
 
     st.write("Churn Probability:", y_proba)
