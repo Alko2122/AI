@@ -83,23 +83,24 @@ user_df = user_df.reindex(columns=columns, fill_value=0)
 
 # 4. Preprocess the User Input
 
-# Scale *ALL* features
-user_df = scaler.transform(user_df)
+# Scale numeric features
+numeric_cols = ["TotalCharges", "TotalServices"]
+user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
 
 # Verify X_scaled has right columns before using model:
-# missing_cols = set(columns) - set(user_df.columns) # Not needed anymore
-# if missing_cols:
-#     st.error(f"Missing columns: {missing_cols}")
-# else:
-#     extra_cols = set(user_df.columns) - set(columns)
-#     if extra_cols:
-#         st.error(f"Extra columns: {extra_cols}")
+missing_cols = set(columns) - set(user_df.columns)
+if missing_cols:
+    st.error(f"Missing columns: {missing_cols}")
+else:
+    extra_cols = set(user_df.columns) - set(columns)
+    if extra_cols:
+        st.error(f"Extra columns: {extra_cols}")
 
 # Make prediction
 if st.button("Predict"):
-    # if missing_cols or extra_cols:
-    #     st.error("Fix the column mismatch before predicting.")
-    # else:
+    if missing_cols or extra_cols:
+        st.error("Fix the column mismatch before predicting.")
+    else:
         y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
 
         st.write("Churn Probability:", y_proba)
