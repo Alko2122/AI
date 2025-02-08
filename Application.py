@@ -2,110 +2,152 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.neural_network import MLPClassifier
+import matplotlib.pyplot as plt
 
-# --- Define the CombinedModel class here ---
-class CombinedModel:
-    def __init__(self, gbm, mlp):
-        self.gbm = gbm
-        self.mlp = mlp
+# Page configuration
+st.set_page_config(
+    page_title="Customer Churn Prediction",
+    page_icon="🔄",
+    layout="wide"
+)
 
-    def predict_proba(self, X):
-        gbm_preds = self.gbm.predict_proba(X)[:, 1]
-        mlp_preds = self.mlp.predict_proba(X)[:, 1]
-        combined_preds = (gbm_preds + mlp_preds) / 2
-        return np.column_stack([1 - combined_preds, combined_preds])
+# Load the model and necessary files
+@st.cache_resource
+def load_model():
+    model = joblib.load('churn_model.joblib')
+    with open('optimal_threshold.txt', 'r') as f:
+        threshold = float(f.read().strip())
+    with open('feature_names.txt', 'r') as f:
+        features = f.read().splitlines()
+    return model, threshold, features
 
-# --- Functions ---
-def load_artifacts():
-    try:
-        model = joblib.load("lgbm_mlp_model.pkl")
-        scaler = joblib.load("scaler.pkl")
-        columns = joblib.load("columns.pkl")
-        return model, scaler, columns
-    except Exception as e:
-        st.error(f"Error loading artifacts: {e}")
-        return None, None, None
+model, threshold, features = load_model()
 
-# --- App Layout ---
-st.set_page_config(page_title="Customer Churn Prediction", layout="wide")
-st.title("Customer Churn Prediction")
+# Title and description
+st.title("🔄 Customer Churn Prediction")
+st.markdown("""
+This application predicts customer churn using a voting ensemble of Neural Network and LightGBM models.
+Upload your data or input values manually to get predictions.
+""")
 
-# --- Load Artifacts ---
-model, scaler, columns = load_artifacts()
+# Sidebar
+st.sidebar.header("Input Method")
+input_method = st.sidebar.radio(
+    "Choose input method:",
+    ["Upload CSV", "Manual Input"]
+)
 
-if not all([model, scaler, columns]):
-    st.stop()
+def make_prediction(input_df):
+    # Get probability predictions
+    proba = model.predict_proba(input_df)[:, 1]
+    # Apply threshold
+    predictions = (proba >= threshold).astype(int)
+    return predictions, proba
 
-# Debugging - Print user_df BEFORE scaling
-st.write("Loaded Columns", columns)
+def format_prediction(prediction, probability):
+    if prediction == 1:
+        return f"❌ High Risk of Churn (Probability: {probability:.2%})"
+    return f"✅ Low Risk of Churn (Probability: {probability:.2%})"
 
-# --- Side Panel for User Input ---
-st.sidebar.header("User Input")
-
-# 1. Gather Input Features
-gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
-senior_citizen = st.sidebar.selectbox("Senior Citizen", [0, 1])
-partner = st.sidebar.selectbox("Partner", ["Yes", "No"])
-dependents = st.sidebar.selectbox("Dependents", ["Yes", "No"])
-paperless_billing = st.sidebar.selectbox("Paperless Billing", ["Yes", "No"])
-total_charges = st.sidebar.number_input("Total Charges", min_value=0.0, value=1000.0)
-total_services = st.sidebar.slider("Total Services", min_value=0, max_value=6, value=3)
-internet_service = st.sidebar.selectbox("Internet Service", ["Fiber optic", "DSL", "No"])
-contract = st.sidebar.selectbox("Contract", ["Month-to-month", "One year", "Two year"])
-payment_method = st.sidebar.selectbox("Payment Method", ["Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"])
-multiple_lines = st.sidebar.selectbox("Multiple Lines", ["No", "Yes", "No phone service"])
-tenure_group_established = st.sidebar.selectbox("Tenure Group Established", [0, 1])
-
-# 2. Create a DataFrame from User Inputs - convert to what the training data expects
-
-# New code to create an *empty* DataFrame with the correct column names
-user_data = {
-    "gender": [1 if gender == "Male" else 0],
-    "SeniorCitizen": [senior_citizen],
-    "Partner": [1 if partner == "Yes" else 0],
-    "Dependents": [1 if dependents == "Yes" else 0],
-    "PaperlessBilling": [1 if paperless_billing == "Yes" else 0],
-    "TotalCharges": [total_charges],
-    "TotalServices": [total_services],
-    "InternetService_Fiber optic": [1 if internet_service == "Fiber optic" else 0],
-    "InternetService_No": [1 if internet_service == "No" else 0],
-    "Contract_One year": [1 if contract == "One year" else 0],
-    "Contract_Two year": [1 if contract == "Two year" else 0],
-    "PaymentMethod_Credit card (automatic)": [1 if payment_method == "Credit card (automatic)" else 0],
-    "PaymentMethod_Electronic check": [1 if payment_method == "Electronic check" else 0],
-    "PaymentMethod_Mailed check": [1 if payment_method == "Mailed check" else 0],
-    "MultipleLines_No phone service": [1 if multiple_lines == "No phone service" else 0],
-    "MultipleLines_Yes": [1 if multiple_lines == "Yes" else 0],
-    "Tenure_Group_Established": [tenure_group_established]
-}
-user_df = pd.DataFrame(user_data)
-
-# 3. Reindex the DataFrame to match training data. Make sure it has all columns.
-user_df = user_df.reindex(columns=columns, fill_value=0)
-
-# 4. Scale the numerical values using trained scaler
-
-numeric_cols = ["TotalCharges", "TotalServices"]
-
-#The problem may be occurring from here, so you need to use .to_numpy() to make it as what the data type the scaler expects
-user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
-
-
-# Make prediction
-if st.button("Predict"):
-    try:
-
-        y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
-
-        st.write("Churn Probability:", y_proba)
-        if y_proba > 0.5:
-            st.warning("Customer is likely to churn.")
+if input_method == "Upload CSV":
+    st.subheader("Upload Data")
+    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+    
+    if uploaded_file is not None:
+        input_df = pd.read_csv(uploaded_file)
+        
+        # Check if all required features are present
+        missing_features = set(features) - set(input_df.columns)
+        if missing_features:
+            st.error(f"Missing features in uploaded file: {missing_features}")
         else:
-            st.success("Customer is unlikely to churn.")
-    except Exception as e:
-        st.error(f"Prediction error: {e}")
+            # Make predictions
+            predictions, probas = make_prediction(input_df[features])
+            
+            # Display results
+            st.subheader("Predictions")
+            results_df = pd.DataFrame({
+                'Prediction': predictions,
+                'Churn Probability': probas
+            })
+            results_df['Status'] = results_df.apply(
+                lambda x: format_prediction(x['Prediction'], x['Churn Probability']),
+                axis=1
+            )
+            
+            # Display metrics
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric(
+                    "Total Customers",
+                    len(predictions)
+                )
+            with col2:
+                st.metric(
+                    "Predicted Churns",
+                    sum(predictions)
+                )
+            
+            # Show detailed results
+            st.dataframe(results_df)
+            
+            # Plot distribution
+            fig, ax = plt.subplots(figsize=(10, 6))
+            plt.hist(probas, bins=50, edgecolor='black')
+            plt.axvline(x=threshold, color='r', linestyle='--', label='Threshold')
+            plt.xlabel('Churn Probability')
+            plt.ylabel('Count')
+            plt.title('Distribution of Churn Probabilities')
+            plt.legend()
+            st.pyplot(fig)
 
-st.write("Some additional info")
+else:
+    st.subheader("Manual Input")
+    
+    # Create input fields for each feature
+    input_data = {}
+    
+    # Create columns for better layout
+    col1, col2 = st.columns(2)
+    for i, feature in enumerate(features):
+        with col1 if i % 2 == 0 else col2:
+            input_data[feature] = st.number_input(
+                f"Enter {feature}",
+                value=0.0,
+                format="%.4f"
+            )
+    
+    if st.button("Predict"):
+        # Create DataFrame from input
+        input_df = pd.DataFrame([input_data])
+        
+        # Make prediction
+        prediction, proba = make_prediction(input_df)
+        
+        # Display result
+        st.subheader("Prediction Result")
+        st.markdown(f"### {format_prediction(prediction[0], proba[0])}")
+        
+        # Create gauge chart for probability
+        fig, ax = plt.subplots(figsize=(10, 2))
+        plt.barh([0], [proba[0]], color='lightblue')
+        plt.barh([0], [1], color='lightgray', alpha=0.3)
+        plt.axvline(x=threshold, color='r', linestyle='--', label='Threshold')
+        plt.xlim(0, 1)
+        plt.yticks([])
+        plt.xlabel('Churn Probability')
+        plt.title('Probability Gauge')
+        plt.legend()
+        st.pyplot(fig)
+
+# Add model information in expander
+with st.expander("Model Information"):
+    st.markdown("""
+    ### Model Details
+    - **Model Type**: Voting Ensemble (Neural Network + LightGBM)
+    - **Decision Threshold**: {:.3f}
+    - **Base Model Performance**:
+        - Accuracy: 0.786
+        - ROC-AUC: 0.829
+        - F1-Score: 0.597
+    """.format(threshold))
