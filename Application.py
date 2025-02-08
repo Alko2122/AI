@@ -39,17 +39,19 @@ model, scaler, columns = load_artifacts()
 if not all([model, scaler, columns]):
     st.stop()
 
-st.write("Loaded columns:", columns)
-st.write(f"Model input types:{type(columns)}")
-
-# --- Debugging: Print the attributes of the scaler that describe the trained features
-
-numeric_features_scaler_trained_on = scaler.feature_names_in_
-
-st.write("Scaler expects features: ", numeric_features_scaler_trained_on)
 
 # --- Side Panel for User Input ---
 st.sidebar.header("User Input")
+
+# Load the reference DataFrame with defined types (from Excel or CSV, as appropriate)
+try:
+    feature_names_df = pd.read_excel("feature_names.xlsx")
+    # Ensure we only load the column to get the list of columns.
+    loaded_columns = feature_names_df["Feature_Names"].tolist()
+    st.write("Successfully loaded DataFrame with defined data types. Check data types and names are what you are expecting.")
+except Exception as e:
+    st.error(f"Error loading reference DataFrame: {e}")
+    st.stop()
 
 # 1. Gather Input Features
 gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
@@ -58,14 +60,14 @@ partner = st.sidebar.selectbox("Partner", ["Yes", "No"])
 dependents = st.sidebar.selectbox("Dependents", ["Yes", "No"])
 paperless_billing = st.sidebar.selectbox("Paperless Billing", ["Yes", "No"])
 total_charges = st.sidebar.number_input("Total Charges", min_value=0.0, value=1000.0)
-total_services = st.sidebar.slider("Total Services", min_value=0, max_value=6, value=3)  # Assuming a max of 6 based on notebook
+total_services = st.sidebar.slider("Total Services", min_value=0, max_value=6, value=3)
 internet_service = st.sidebar.selectbox("Internet Service", ["Fiber optic", "DSL", "No"])
 contract = st.sidebar.selectbox("Contract", ["Month-to-month", "One year", "Two year"])
 payment_method = st.sidebar.selectbox("Payment Method", ["Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"])
 multiple_lines = st.sidebar.selectbox("Multiple Lines", ["No", "Yes", "No phone service"])
 tenure_group_established = st.sidebar.selectbox("Tenure Group Established", [0, 1])
 
-# 2. Create a DataFrame from User Inputs - with all columns and correct types
+
 user_data = {
     "gender": [1 if gender == "Male" else 0],
     "SeniorCitizen": [senior_citizen],
@@ -88,26 +90,25 @@ user_data = {
 
 user_df = pd.DataFrame(user_data)
 
-# 3. Ensure User DataFrame has same columns and order as trained model (Important!)
-user_df = user_df.reindex(columns=columns, fill_value=0)
 
-st.write("User data", user_df)
+user_df = user_df.reindex(columns=loaded_columns, fill_value=0)
 
-# 4. Preprocess the User Input
-numeric_cols = ["TotalCharges", "TotalServices"]
+# Verify
+st.write("User Data before Scaling:", user_df.dtypes)
+# 4. Preprocess the User Input, scale all, not just numeric
 
-user_df[numeric_cols] = scaler.transform(user_df[numeric_cols])
-
-
+user_df = scaler.transform(user_df)
 # Make prediction
 if st.button("Predict"):
+    try:
+        y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
 
-    y_proba = model.predict_proba(user_df)[0, 1]  # Get churn probability
-
-    st.write("Churn Probability:", y_proba)
-    if y_proba > 0.5:
-        st.warning("Customer is likely to churn.")
-    else:
-        st.success("Customer is unlikely to churn.")
+        st.write("Churn Probability:", y_proba)
+        if y_proba > 0.5:
+            st.warning("Customer is likely to churn.")
+        else:
+            st.success("Customer is unlikely to churn.")
+    except Exception as e:
+        st.error(f"Prediction error: {e}")
 
 st.write("Some additional info")
