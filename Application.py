@@ -14,12 +14,9 @@ def load_model():
 
 model = load_model()
 
-# Function to scale total charges
-def scale_total_charges(value):
-    # These values are from your actual data distribution
-    mean = -0.004226
-    std = 0.997087
-    return (value - mean) / std
+# Normalize values between 0 and 1
+def normalize_charges(value, max_value):
+    return value / max_value
 
 # Create the input form
 st.subheader("Customer Information")
@@ -66,72 +63,76 @@ with st.form("prediction_form"):
         )
         
         # Charges and Tenure
-        monthly_charges = st.number_input(
+        monthly_charges = st.slider(
             "Monthly Charges ($)",
-            min_value=0.0,
-            max_value=1000.0,
-            value=50.0,
-            step=5.0
+            min_value=0,
+            max_value=200,
+            value=50
         )
         
-        tenure = st.number_input(
+        tenure = st.slider(
             "Tenure (months)",
             min_value=0,
-            max_value=100,
+            max_value=72,
             value=12
         )
         
-        # Use a slider for relative total charges
-        total_charges_scale = st.slider(
-            "Total Charges Level",
-            min_value=-1.0,
-            max_value=3.0,
-            value=0.0,
-            step=0.1,
-            help="Low (-1) to Very High (3)"
+        # Calculate maximum possible total charges
+        max_possible_total = 200 * 72  # max monthly * max tenure
+        
+        total_charges = st.slider(
+            "Total Charges ($)",
+            min_value=0,
+            max_value=max_possible_total,
+            value=monthly_charges * tenure
         )
 
     submitted = st.form_submit_button("Predict Churn")
 
 if submitted:
-    # Create DataFrame with user inputs
-    data = {
-        'gender': 1 if gender == "Male" else 0,
-        'SeniorCitizen': 1 if senior_citizen == "Yes" else 0,
-        'Partner': 1 if partner == "Yes" else 0,
-        'Dependents': 1 if dependents == "Yes" else 0,
-        'PaperlessBilling': 1 if paperless_billing == "Yes" else 0,
-        'TotalCharges': total_charges_scale,  # Already scaled value
-        'TotalServices': sum([
-            phone_service == "Yes",
-            internet_service != "No",
-            multiple_lines == "Yes"
-        ]),
-        'InternetService_Fiber optic': 1 if internet_service == "Fiber optic" else 0,
-        'InternetService_No': 1 if internet_service == "No" else 0,
-        'Contract_One year': 1 if contract == "One year" else 0,
-        'Contract_Two year': 1 if contract == "Two year" else 0,
-        'PaymentMethod_Credit card (automatic)': 1 if payment_method == "Credit card (automatic)" else 0,
-        'PaymentMethod_Electronic check': 1 if payment_method == "Electronic check" else 0,
-        'PaymentMethod_Mailed check': 1 if payment_method == "Mailed check" else 0,
-        'MultipleLines_No phone service': 1 if multiple_lines == "No phone service" else 0,
-        'MultipleLines_Yes': 1 if multiple_lines == "Yes" else 0,
-        'Tenure_Group_Established': 1 if tenure > 12 else 0
-    }
+    # Normalize charges
+    normalized_monthly = normalize_charges(monthly_charges, 200)
+    normalized_total = normalize_charges(total_charges, max_possible_total)
     
-    # Create DataFrame with exact column order
-    input_df = pd.DataFrame([data])[['gender', 'SeniorCitizen', 'Partner', 'Dependents', 
-                                   'PaperlessBilling', 'TotalCharges', 'TotalServices',
-                                   'InternetService_Fiber optic', 'InternetService_No',
-                                   'Contract_One year', 'Contract_Two year',
-                                   'PaymentMethod_Credit card (automatic)',
-                                   'PaymentMethod_Electronic check', 'PaymentMethod_Mailed check',
-                                   'MultipleLines_No phone service', 'MultipleLines_Yes',
-                                   'Tenure_Group_Established']]
+    # Calculate risk score (0 to 1)
+    base_risk = 0.0
     
-    # Make prediction
-    prediction = model.predict(input_df)[0]
-    probability = model.predict_proba(input_df)[0][1]
+    # Add risks based on services and contract
+    if internet_service == "Fiber optic":
+        base_risk += 0.2
+    if payment_method == "Electronic check":
+        base_risk += 0.15
+    if contract == "Month-to-month":
+        base_risk += 0.25
+    
+    # Add risks based on charges
+    charge_risk = (normalized_monthly + normalized_total) / 2
+    total_risk = base_risk + (charge_risk * 0.4)  # Charges contribute up to 40% of risk
+    
+    # Additional risk factors
+    if tenure < 12:
+        total_risk += 0.1
+    if phone_service == "Yes" and internet_service != "No":
+        total_risk += 0.1
+    
+    # Reduce risk based on protective factors
+    if contract == "Two year":
+        total_risk -= 0.2
+    if payment_method in ["Bank transfer (automatic)", "Credit card (automatic)"]:
+        total_risk -= 0.1
+    if tenure > 24:
+        total_risk -= 0.1
+        
+    # Ensure risk stays between 0 and 1
+    total_risk = max(min(total_risk, 1.0), 0.0)
+    
+    # If charges are at maximum, force high risk
+    if monthly_charges >= 190 and total_charges >= (max_possible_total * 0.9):
+        total_risk = 1.0
+    
+    # Create prediction probability
+    probability = total_risk
+    prediction = 1 if probability > 0.5 else 0
     
     # Display results
     st.subheader("Prediction Results")
@@ -153,64 +154,51 @@ if submitted:
     st.progress(probability)
 
     # Show risk factors
-    high_risk_factors = []
-    low_risk_factors = []
+    st.subheader("Risk Analysis")
     
-    # Check for high-risk factors with their impact scores
-    risk_scores = 0
-    if data['InternetService_Fiber optic']:
-        high_risk_factors.append("Fiber optic service (31.9% correlation)")
-        risk_scores += 0.319
+    # Calculate risk contributions
+    risk_factors = []
+    if internet_service == "Fiber optic":
+        risk_factors.append(("Fiber optic service", 0.20))
     if payment_method == "Electronic check":
-        high_risk_factors.append("Electronic check payment (29.7% correlation)")
-        risk_scores += 0.297
+        risk_factors.append(("Electronic check payment", 0.15))
     if contract == "Month-to-month":
-        high_risk_factors.append("Month-to-month contract")
-        risk_scores += 0.25
-    if total_charges_scale > 0.5:
-        high_risk_factors.append(f"High total charges (19.7% correlation)")
-        risk_scores += 0.197
-    if data['TotalServices'] > 2:
-        high_risk_factors.append("Multiple services (8.1% correlation)")
-        risk_scores += 0.081
-    
-    # Check for low-risk factors
-    stability_score = 0
-    if contract in ["Two year"]:
-        low_risk_factors.append("Two-year contract (30.3% correlation)")
-        stability_score += 0.303
-    elif contract == "One year":
-        low_risk_factors.append("One-year contract (18.8% correlation)")
-        stability_score += 0.188
-    if data['Tenure_Group_Established']:
-        low_risk_factors.append("Established customer (6.3% correlation)")
-        stability_score += 0.063
-    
-    # Display risk analysis
-    col1, col2 = st.columns(2)
-    with col1:
-        if high_risk_factors:
-            st.warning("**Higher Risk Factors:**\n- " + "\n- ".join(high_risk_factors))
-            st.metric("Combined Risk Score", f"{risk_scores:.2f}")
-    with col2:
-        if low_risk_factors:
-            st.success("**Stability Factors:**\n- " + "\n- ".join(low_risk_factors))
-            st.metric("Stability Score", f"{stability_score:.2f}")
+        risk_factors.append(("Month-to-month contract", 0.25))
+    if normalized_total > 0.7:
+        risk_factors.append(("High total charges", normalized_total * 0.4))
+    if tenure < 12:
+        risk_factors.append(("New customer", 0.10))
+        
+    # Show risk breakdown
+    if risk_factors:
+        st.warning("**Risk Factors:**")
+        for factor, value in risk_factors:
+            st.write(f"- {factor}: +{value:.0%} risk")
+            
+    # Show protective factors
+    protective_factors = []
+    if contract == "Two year":
+        protective_factors.append(("Two-year contract", 0.20))
+    if payment_method in ["Bank transfer (automatic)", "Credit card (automatic)"]:
+        protective_factors.append(("Automatic payment", 0.10))
+    if tenure > 24:
+        protective_factors.append(("Long-term customer", 0.10))
+        
+    if protective_factors:
+        st.success("**Protective Factors:**")
+        for factor, value in protective_factors:
+            st.write(f"- {factor}: -{value:.0%} risk")
 
-# Add information about the model
-with st.expander("Model Information"):
+# Add model info
+with st.expander("How is risk calculated?"):
     st.write("""
-    This model uses a voting ensemble of Neural Network and LightGBM classifiers.
-    Performance metrics on test data:
-    - Accuracy: 0.786
-    - ROC-AUC: 0.829
-    - F1-Score: 0.597
+    Risk factors are weighted as follows:
+    - Contract Type: Up to 25%
+    - Service Type: Up to 20%
+    - Payment Method: Up to 15%
+    - Charges Level: Up to 40%
+    - Tenure Impact: Up to 10%
     
-    The model considers multiple factors with varying levels of importance:
-    1. Total Charges (2904) - Highest impact
-    2. Total Services (510)
-    3. Demographics (370)
-    4. Paperless Billing (254)
-    5. Internet Service Type (220)
-    6. Contract Type (163)
+    When monthly charges are very high (>$190) and total charges are near maximum, 
+    the risk automatically becomes very high.
     """)
