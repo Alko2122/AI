@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import openai
 from datetime import datetime
 
 # Page config
@@ -125,73 +124,15 @@ What would you like to know about?"""
 
 What would you like to know?"""
 
-# Initialize chat history if it doesn't exist
+# Initialize chat history
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
     # Add initial greeting
     st.session_state.chat_history.append(
         ("assistant", "Hello! 👋 I'm your telecom package assistant. How can I help you today?")
     )
-   
-# Package Information for AI
-PACKAGE_INFO = """
-1. Basic Package ($50/month):
-   - DSL Internet (50 Mbps)
-   - Email Support
-   - Ideal for basic browsing and email
 
-2. Standard Package ($85/month):
-   - Fiber Optic Internet (200 Mbps)
-   - Phone Service
-   - 24/7 Technical Support
-   - Great for streaming and gaming
-
-3. Premium Package ($120/month):
-   - Fiber Optic Internet (500 Mbps)
-   - Phone Service
-   - Premium 24/7 Support
-   - Extra Features (Cloud Storage, Security Suite)
-   - Perfect for heavy users and businesses
-"""
-
-def get_ai_response(history, new_message, package_info):
-    messages = [
-        {"role": "system", "content": f"""You are a helpful telecommunications service assistant. 
-        Here are the available packages:
-        {package_info}
-        
-        Your goal is to help customers choose the best package based on their needs.
-        Be concise, friendly, and provide specific package recommendations when appropriate.
-        Always maintain the conversation context and remember previous customer preferences.
-        Stay focused on telecom packages and related services."""}
-    ]
-    
-    for msg in history:
-        messages.append({
-            "role": "user" if msg[0] == "user" else "assistant",
-            "content": msg[1]
-        })
-    
-    messages.append({"role": "user", "content": new_message})
-    
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=150
-        )
-        return response.choices[0].message['content']
-    except Exception as e:
-        return f"I apologize, but I'm having trouble connecting. Please try again or contact our support team. Error: {str(e)}"
-
-# Initialize chat history
-if 'chat_history' not in st.session_state:
-    st.session_state.chat_history = []
-    initial_ai_msg = get_ai_response([], "Start a new conversation to help choose a package", PACKAGE_INFO)
-    st.session_state.chat_history.append(("assistant", initial_ai_msg))
-
-# Sidebar for AI Assistant
+# Main app - AI Assistant Sidebar
 st.sidebar.title("💬 AI Package Assistant")
 
 # Chat interface
@@ -206,9 +147,16 @@ for message in st.session_state.chat_history:
 user_input = st.sidebar.text_input("Type your message here...")
 if st.sidebar.button("Send"):
     if user_input:
+        # Add user message to history
         st.session_state.chat_history.append(("user", user_input))
-        ai_response = get_ai_response(st.session_state.chat_history[:-1], user_input, PACKAGE_INFO)
+        
+        # Get assistant response
+        ai_response = get_assistant_response(user_input)
+        
+        # Add assistant response to history
         st.session_state.chat_history.append(("assistant", ai_response))
+        
+        # Rerun to update chat display
         st.experimental_rerun()
 
 # Quick action buttons
@@ -216,23 +164,23 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("**Quick Actions:**")
 cols = st.sidebar.columns(2)
 if cols[0].button("Compare Packages"):
-    comparison_query = "Can you compare all available packages and their features?"
+    comparison_query = "Compare packages"
     st.session_state.chat_history.append(("user", comparison_query))
-    ai_response = get_ai_response(st.session_state.chat_history[:-1], comparison_query, PACKAGE_INFO)
+    ai_response = get_assistant_response(comparison_query)
     st.session_state.chat_history.append(("assistant", ai_response))
     st.experimental_rerun()
 
 if cols[1].button("Best Deals"):
-    deals_query = "What are the current best deals or promotions?"
+    deals_query = "What are your best deals?"
     st.session_state.chat_history.append(("user", deals_query))
-    ai_response = get_ai_response(st.session_state.chat_history[:-1], deals_query, PACKAGE_INFO)
+    ai_response = get_assistant_response(deals_query)
     st.session_state.chat_history.append(("assistant", ai_response))
     st.experimental_rerun()
 
 # Clear chat button
 if st.sidebar.button("Clear Chat"):
     st.session_state.chat_history = []
-    initial_ai_msg = get_ai_response([], "Start a new conversation to help choose a package", PACKAGE_INFO)
+    initial_ai_msg = "Hello! 👋 I'm your telecom package assistant. How can I help you today?"
     st.session_state.chat_history.append(("assistant", initial_ai_msg))
     st.experimental_rerun()
 
@@ -352,23 +300,30 @@ if submitted:
     # Calculate risks
     tenure_impact = calculate_tenure_impact(tenure)
     charges_risk = calculate_charges_risk(monthly_charges, total_charges, tenure)
+    
+    # Combine all risk factors
     total_risk = base_risk + tenure_impact + charges_risk
     
-    # Additional adjustments
+    # Additional service-based adjustments
     if phone_service == "Yes" and internet_service != "No":
         total_risk += 0.05
     if paperless_billing == "Yes":
         total_risk += 0.05
+    
+    # Payment method adjustments
     if payment_method in ["Bank transfer (automatic)", "Credit card (automatic)"]:
         total_risk -= 0.10
     
     # Special cases
     if monthly_charges >= 190 and tenure <= 6:
-        total_risk += 0.3
+        total_risk += 0.3  # Very high risk for new customers with high charges
     elif monthly_charges >= 190 and tenure >= 48:
-        total_risk -= 0.1
+        total_risk -= 0.1  # Lower risk for long-term customers even with high charges
     
+    # Ensure risk stays between 0 and 1
     total_risk = max(min(total_risk, 1.0), 0.0)
+    
+    # Convert to probability
     probability = total_risk
     prediction = 1 if probability > 0.5 else 0
     
@@ -383,12 +338,17 @@ if submitted:
             st.success("✅ Low Risk of Churn")
             
     with col2:
-        st.metric("Churn Probability", f"{probability:.1%}")
+        st.metric(
+            "Churn Probability",
+            f"{probability:.1%}"
+        )
     
+    # Display gauge chart for probability
     st.progress(probability)
 
-    # Risk Analysis
+    # Show detailed risk breakdown
     st.subheader("Risk Analysis")
+    
     col1, col2 = st.columns(2)
     
     with col1:
@@ -396,7 +356,7 @@ if submitted:
         if charges_risk > 0:
             st.write(f"- Charges Impact: +{charges_risk:.0%}")
         if tenure_impact > 0:
-            st.write(f"- Tenure Risk: +{tenure_impact:.0%}")
+            st.write(f"- Tenure Risk (Customer Age): +{tenure_impact:.0%}")
         if internet_service == "Fiber optic":
             st.write("- Fiber Service: +15%")
         if payment_method == "Electronic check":
@@ -415,7 +375,7 @@ if submitted:
         if payment_method in ["Bank transfer (automatic)", "Credit card (automatic)"]:
             st.write("- Automatic Payment: -10%")
 
-    # Relationship explanation
+    # Show relationship explanation
     st.write("\n**Key Relationships:**")
     st.info(f"""
     - Tenure {tenure} months: {'Very Stable' if tenure > 48 else 'Stable' if tenure > 24 else 'Moderate' if tenure > 12 else 'New Customer'}
@@ -423,7 +383,7 @@ if submitted:
     - Impact of Tenure on Charges Risk: {'Significantly Reduced' if tenure > 48 else 'Reduced' if tenure > 24 else 'Slightly Reduced' if tenure > 12 else 'No Reduction'}
     """)
 
-# Model information
+# Add model info
 with st.expander("How is risk calculated?"):
     st.write("""
     Risk factors are weighted as follows:
@@ -435,7 +395,4 @@ with st.expander("How is risk calculated?"):
     
     Special considerations:
     - New customers (≤6 months) with high charges have increased risk
-    - Long-term customers (>48 months) have reduced risk even with high charges
-    - Multiple services and paperless billing add small additional risk
-    - Automatic payments provide risk reduction
-    """)
+    - Long-term customers (>48 months) have reduced risk even with high
