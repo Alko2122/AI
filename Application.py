@@ -4,45 +4,10 @@ import numpy as np
 import joblib
 import requests
 
-# Main app - AI Assistant Sidebar
-st.sidebar.title("💬 AI Package Assistant")
+# Page config
+st.set_page_config(page_title="Telco Customer Service", layout="wide")
 
-# Chat interface
-for message in st.session_state.chat_history:
-    role, content = message
-    if role == "user":
-        st.sidebar.markdown(f"👤 **You:** {content}")
-    else:
-        st.sidebar.markdown(f"🤖 **Assistant:** {content}")
-
-# User input
-user_input = st.sidebar.text_input("Type your message here...")
-
-# Quick action buttons
-st.sidebar.markdown("---")
-st.sidebar.markdown("**Quick Actions:**")
-cols = st.sidebar.columns(2)
-if cols[0].button("Compare Packages"):
-    comparison_query = "Compare packages"
-    st.session_state.chat_history.append(("user", comparison_query))
-    ai_response = get_assistant_response(comparison_query, historical_insights, huggingface_api_key)
-    st.session_state.chat_history.append(("assistant", ai_response))
-    st.rerun()
-
-if cols[1].button("Service Insights"):
-    insights_query = "Show me service insights and statistics"
-    st.session_state.chat_history.append(("user", insights_query))
-    ai_response = get_assistant_response(insights_query, historical_insights, huggingface_api_key)
-    st.session_state.chat_history.append(("assistant", ai_response))
-    st.rerun()
-
-# Clear chat button
-if st.sidebar.button("Clear Chat"):
-    st.session_state.chat_history = []
-    initial_ai_msg = "Hello! 👋 I'm your telecom package assistant. How can I help you today?"
-    st.session_state.chat_history.append(("assistant", initial_ai_msg))
-    st.rerun()
-
+# Define all functions
 def analyze_historical_data(df):
     if df is None:
         return {
@@ -70,8 +35,36 @@ def analyze_historical_data(df):
         'avg_tenure_stayed': df[df['Churn']=='No']['tenure'].mean()
     }
 
+def get_huggingface_response(prompt, api_key):
+    API_URL = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-large"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    
+    def query(payload):
+        response = requests.post(API_URL, headers=headers, json=payload)
+        return response.json()
+    
+    full_prompt = f"""You are a telecom service assistant. Here are our packages:
+    Basic Package ($50/month): DSL Internet (50 Mbps), Email Support
+    Standard Package ($85/month): Fiber Optic (200 Mbps), Phone Service, 24/7 Support
+    Premium Package ($120/month): Fiber Optic (500 Mbps), Premium Support, Extra Features
+
+    Customer query: {prompt}
+    """
+    
+    try:
+        output = query({
+            "inputs": full_prompt,
+            "parameters": {"max_length": 150}
+        })
+        
+        if isinstance(output, dict) and 'error' in output:
+            return f"I apologize, but I'm having trouble connecting. Please try again or contact our support team. Error: {output['error']}"
+            
+        return output[0]['generated_text']
+    except Exception as e:
+        return f"I apologize, but I'm having trouble right now. Please try again later."
+
 def get_data_driven_response(message, insights):
-    """Generate responses using historical data insights"""
     message = message.lower()
     
     if 'average' in message and 'tenure' in message:
@@ -101,22 +94,22 @@ def get_data_driven_response(message, insights):
     return None
 
 def get_rule_based_response(message, insights):
-    """Default rule-based responses"""
     message = message.lower()
     
     if 'price' in message or 'cost' in message:
-        return """Our packages range from:
-        • Basic: $50/month
-        • Standard: $85/month
-        • Premium: $120/month
+        return f"""Our packages range from:
+        • Basic: $50/month (${insights['avg_monthly_charges']-50:.2f} below average)
+        • Standard: $85/month (close to average)
+        • Premium: $120/month (premium features)
         
         Which price range interests you?"""
     
     elif 'internet' in message or 'speed' in message:
-        return """We offer:
+        return f"""We offer:
         • DSL: 50 Mbps
         • Fiber Optic: 200-500 Mbps
         
+        Our most popular choice is {insights['popular_internet']}.
         What speed are you looking for?"""
     
     elif 'help' in message:
@@ -130,11 +123,26 @@ def get_rule_based_response(message, insights):
     
     return "How can I help you choose the right package? You can ask about prices, speeds, or features."
 
+def get_assistant_response(message, insights, hf_api_key=None):
+    # First try to get a data-driven response
+    data_response = get_data_driven_response(message, insights)
+    if data_response:
+        return data_response
+        
+    # If no data-driven response and HuggingFace API is available, use it
+    if hf_api_key:
+        ai_response = get_huggingface_response(message, hf_api_key)
+        if ai_response and "error" not in ai_response.lower():
+            return ai_response
+    
+    # Fall back to rule-based responses
+    return get_rule_based_response(message, insights)
+
 # Load historical data
 @st.cache_data
 def load_historical_data():
     try:
-        df = pd.read_csv('Dataset.csv')
+        df = pd.read_csv('dataset.csv')
         return df
     except:
         st.warning("Historical dataset not found. Using default insights.")
@@ -150,68 +158,55 @@ if 'chat_history' not in st.session_state:
     st.session_state.chat_history.append(
         ("assistant", "Hello! 👋 I'm your telecom package assistant. How can I help you today?")
     )
-    
-def get_huggingface_response(prompt, api_key):
-    API_URL = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-large"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    
-    def query(payload):
-        response = requests.post(API_URL, headers=headers, json=payload)
-        return response.json()
-        
-    # Add context about telecom packages
-    full_prompt = f"""You are a telecom service assistant. Here are our packages:
-    Basic Package ($50/month): DSL Internet (50 Mbps), Email Support
-    Standard Package ($85/month): Fiber Optic (200 Mbps), Phone Service, 24/7 Support
-    Premium Package ($120/month): Fiber Optic (500 Mbps), Premium Support, Extra Features
 
-    Customer query: {prompt}
-    """
-    
-    try:
-        output = query({
-            "inputs": full_prompt,
-            "parameters": {"max_length": 150}
-        })
-        
-        if isinstance(output, dict) and 'error' in output:
-            return f"I apologize, but I'm having trouble connecting. Please try again or contact our support team. Error: {output['error']}"
-            
-        return output[0]['generated_text']
-    except Exception as e:
-        return f"I apologize, but I'm having trouble right now. Please try again later."
+# HuggingFace API key
+huggingface_api_key = "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"
 
-def get_assistant_response(message, insights, hf_api_key=None):
-    """Enhanced assistant response function with HuggingFace integration"""
-    
-    # First try to get a data-driven response
-    data_response = get_data_driven_response(message, insights)
-    if data_response:
-        return data_response
-        
-    # If no data-driven response and HuggingFace API is available, use it
-    if hf_api_key:
-        ai_response = get_huggingface_response(message, hf_api_key)
-        if ai_response and "error" not in ai_response.lower():
-            return ai_response
-    
-    # Fall back to rule-based responses
-    return get_rule_based_response(message, insights)
+# Sidebar Chat Interface
+st.sidebar.title("💬 AI Package Assistant")
 
-# Add this to your Streamlit app:
-huggingface_api_key = "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"  # Replace with your key
+# Chat interface
+for message in st.session_state.chat_history:
+    role, content = message
+    if role == "user":
+        st.sidebar.markdown(f"👤 **You:** {content}")
+    else:
+        st.sidebar.markdown(f"🤖 **Assistant:** {content}")
 
-# Update the chat interface:
+# User input and send button
+user_input = st.sidebar.text_input("Type your message here...")
 if st.sidebar.button("Send"):
     if user_input:
         st.session_state.chat_history.append(("user", user_input))
         ai_response = get_assistant_response(user_input, historical_insights, huggingface_api_key)
         st.session_state.chat_history.append(("assistant", ai_response))
         st.rerun()
-        
-# Main app - Churn Prediction
-st.title("Customer Churn Prediction")
 
+# Quick action buttons
+st.sidebar.markdown("---")
+st.sidebar.markdown("**Quick Actions:**")
+cols = st.sidebar.columns(2)
+if cols[0].button("Compare Packages"):
+    comparison_query = "Compare packages"
+    st.session_state.chat_history.append(("user", comparison_query))
+    ai_response = get_assistant_response(comparison_query, historical_insights, huggingface_api_key)
+    st.session_state.chat_history.append(("assistant", ai_response))
+    st.rerun()
+
+if cols[1].button("Service Insights"):
+    insights_query = "Show me service insights and statistics"
+    st.session_state.chat_history.append(("user", insights_query))
+    ai_response = get_assistant_response(insights_query, historical_insights, huggingface_api_key)
+    st.session_state.chat_history.append(("assistant", ai_response))
+    st.rerun()
+
+# Clear chat button
+if st.sidebar.button("Clear Chat"):
+    st.session_state.chat_history = []
+    initial_ai_msg = "Hello! 👋 I'm your telecom package assistant. How can I help you today?"
+    st.session_state.chat_history.append(("assistant", initial_ai_msg))
+    st.rerun()
+    
 # Load the model
 @st.cache_resource
 def load_model():
