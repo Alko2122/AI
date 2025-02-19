@@ -1,15 +1,4 @@
-streamlit==1.29.0  # Known to have better compatibility
-fastapi
-uvicorn
-requests
+streamlit
 pandas
-scikit-learn==1.4.2  # Match the version used to train the model
+numpy
 joblib
-numpy==1.26.4  # Make sure numpy is compatible with scikit-learn
-lightgbm==4.1.0   #Explicitly define version
-
-torch==2.3.0       #Try a newer version
-torchvision==0.18.0 #Try a newer version
-torchaudio==0.13.0  #Try a newer version
-pydantic
-typing-extensions #Check to make sure this package is included, since you are getting it with typing import
