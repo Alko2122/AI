@@ -142,7 +142,7 @@ def get_assistant_response(message, insights, hf_api_key=None):
 @st.cache_data
 def load_historical_data():
     try:
-        df = pd.read_csv('dataset.csv')
+        df = pd.read_csv('Dataset.csv')
         return df
     except:
         st.warning("Historical dataset not found. Using default insights.")
