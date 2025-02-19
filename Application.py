@@ -168,21 +168,21 @@ if cols[0].button("Compare Packages"):
     st.session_state.chat_history.append(("user", comparison_query))
     ai_response = get_assistant_response(comparison_query)
     st.session_state.chat_history.append(("assistant", ai_response))
-    st.experimental_rerun()
+    st.rerun()
 
 if cols[1].button("Best Deals"):
     deals_query = "What are your best deals?"
     st.session_state.chat_history.append(("user", deals_query))
     ai_response = get_assistant_response(deals_query)
     st.session_state.chat_history.append(("assistant", ai_response))
-    st.experimental_rerun()
+    st.rerun()
 
 # Clear chat button
 if st.sidebar.button("Clear Chat"):
     st.session_state.chat_history = []
     initial_ai_msg = "Hello! 👋 I'm your telecom package assistant. How can I help you today?"
     st.session_state.chat_history.append(("assistant", initial_ai_msg))
-    st.experimental_rerun()
+    st.rerun()
 
 # Main app - Churn Prediction
 st.title("Customer Churn Prediction")
