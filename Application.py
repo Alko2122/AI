@@ -36,7 +36,7 @@ def analyze_historical_data(df):
     }
 
 def get_huggingface_response(prompt, api_key):
-    API_URL = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-large"
+    API_URL = "https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill"
     headers = {"Authorization": f"Bearer {api_key}"}
     
     def query(payload):
