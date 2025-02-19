@@ -250,7 +250,7 @@ if st.sidebar.button("Send"):
         st.session_state.chat_history.append(("assistant", ai_response))
         
         # Rerun to update chat display
-        st.experimental_rerun()
+        st.rerun()
 
 # Quick action buttons
 st.sidebar.markdown("---")
@@ -261,21 +261,21 @@ if cols[0].button("Compare Packages"):
     st.session_state.chat_history.append(("user", comparison_query))
     ai_response = get_assistant_response(comparison_query, historical_insights)
     st.session_state.chat_history.append(("assistant", ai_response))
-    st.experimental_rerun()
+    st.rerun()
 
 if cols[1].button("Service Insights"):
     insights_query = "Show me service insights and statistics"
     st.session_state.chat_history.append(("user", insights_query))
     ai_response = get_assistant_response(insights_query, historical_insights)
     st.session_state.chat_history.append(("assistant", ai_response))
-    st.experimental_rerun()
+    st.rerun()
 
 # Clear chat button
 if st.sidebar.button("Clear Chat"):
     st.session_state.chat_history = []
     initial_ai_msg = "Hello! 👋 I'm your telecom package assistant. How can I help you today?"
     st.session_state.chat_history.append(("assistant", initial_ai_msg))
-    st.experimental_rerun()
+    st.rerun()
 
 # Main app - Churn Prediction
 st.title("Customer Churn Prediction")
