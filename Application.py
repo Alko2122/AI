@@ -2,9 +2,119 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import openai
+from datetime import datetime
 
 # Page config
-st.set_page_config(page_title="Customer Churn Prediction", layout="wide")
+st.set_page_config(page_title="Telco Customer Service", layout="wide")
+
+# Configure OpenAI
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+# Package Information for AI
+PACKAGE_INFO = """
+1. Basic Package ($50/month):
+   - DSL Internet (50 Mbps)
+   - Email Support
+   - Ideal for basic browsing and email
+
+2. Standard Package ($85/month):
+   - Fiber Optic Internet (200 Mbps)
+   - Phone Service
+   - 24/7 Technical Support
+   - Great for streaming and gaming
+
+3. Premium Package ($120/month):
+   - Fiber Optic Internet (500 Mbps)
+   - Phone Service
+   - Premium 24/7 Support
+   - Extra Features (Cloud Storage, Security Suite)
+   - Perfect for heavy users and businesses
+"""
+
+def get_ai_response(history, new_message, package_info):
+    messages = [
+        {"role": "system", "content": f"""You are a helpful telecommunications service assistant. 
+        Here are the available packages:
+        {package_info}
+        
+        Your goal is to help customers choose the best package based on their needs.
+        Be concise, friendly, and provide specific package recommendations when appropriate.
+        Always maintain the conversation context and remember previous customer preferences.
+        Stay focused on telecom packages and related services."""}
+    ]
+    
+    for msg in history:
+        messages.append({
+            "role": "user" if msg[0] == "user" else "assistant",
+            "content": msg[1]
+        })
+    
+    messages.append({"role": "user", "content": new_message})
+    
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=150
+        )
+        return response.choices[0].message['content']
+    except Exception as e:
+        return f"I apologize, but I'm having trouble connecting. Please try again or contact our support team. Error: {str(e)}"
+
+# Initialize chat history
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
+    initial_ai_msg = get_ai_response([], "Start a new conversation to help choose a package", PACKAGE_INFO)
+    st.session_state.chat_history.append(("assistant", initial_ai_msg))
+
+# Sidebar for AI Assistant
+st.sidebar.title("💬 AI Package Assistant")
+
+# Chat interface
+for message in st.session_state.chat_history:
+    role, content = message
+    if role == "user":
+        st.sidebar.markdown(f"👤 **You:** {content}")
+    else:
+        st.sidebar.markdown(f"🤖 **Assistant:** {content}")
+
+# User input
+user_input = st.sidebar.text_input("Type your message here...")
+if st.sidebar.button("Send"):
+    if user_input:
+        st.session_state.chat_history.append(("user", user_input))
+        ai_response = get_ai_response(st.session_state.chat_history[:-1], user_input, PACKAGE_INFO)
+        st.session_state.chat_history.append(("assistant", ai_response))
+        st.experimental_rerun()
+
+# Quick action buttons
+st.sidebar.markdown("---")
+st.sidebar.markdown("**Quick Actions:**")
+cols = st.sidebar.columns(2)
+if cols[0].button("Compare Packages"):
+    comparison_query = "Can you compare all available packages and their features?"
+    st.session_state.chat_history.append(("user", comparison_query))
+    ai_response = get_ai_response(st.session_state.chat_history[:-1], comparison_query, PACKAGE_INFO)
+    st.session_state.chat_history.append(("assistant", ai_response))
+    st.experimental_rerun()
+
+if cols[1].button("Best Deals"):
+    deals_query = "What are the current best deals or promotions?"
+    st.session_state.chat_history.append(("user", deals_query))
+    ai_response = get_ai_response(st.session_state.chat_history[:-1], deals_query, PACKAGE_INFO)
+    st.session_state.chat_history.append(("assistant", ai_response))
+    st.experimental_rerun()
+
+# Clear chat button
+if st.sidebar.button("Clear Chat"):
+    st.session_state.chat_history = []
+    initial_ai_msg = get_ai_response([], "Start a new conversation to help choose a package", PACKAGE_INFO)
+    st.session_state.chat_history.append(("assistant", initial_ai_msg))
+    st.experimental_rerun()
+
+# Main app - Churn Prediction
 st.title("Customer Churn Prediction")
 
 # Load the model
@@ -14,10 +124,6 @@ def load_model():
 
 model = load_model()
 
-# Normalize values between 0 and 1
-def normalize_charges(value, max_value):
-    return value / max_value
-
 # Create the input form
 st.subheader("Customer Information")
 
@@ -25,14 +131,12 @@ with st.form("prediction_form"):
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        # Basic Information
         gender = st.selectbox("Gender", ["Female", "Male"])
         senior_citizen = st.selectbox("Senior Citizen", ["No", "Yes"])
         partner = st.selectbox("Partner", ["No", "Yes"])
         dependents = st.selectbox("Dependents", ["No", "Yes"])
     
     with col2:
-        # Services
         internet_service = st.selectbox(
             "Internet Service", 
             ["DSL", "Fiber optic", "No"]
@@ -42,15 +146,12 @@ with st.form("prediction_form"):
             "Multiple Lines",
             ["No", "Yes", "No phone service"]
         )
-        
-        # Contract
         contract = st.selectbox(
             "Contract", 
             ["Month-to-month", "One year", "Two year"]
         )
         
     with col3:
-        # Billing
         paperless_billing = st.selectbox("Paperless Billing", ["No", "Yes"])
         payment_method = st.selectbox(
             "Payment Method",
@@ -62,7 +163,6 @@ with st.form("prediction_form"):
             ]
         )
         
-        # Charges and Tenure
         monthly_charges = st.slider(
             "Monthly Charges ($)",
             min_value=0,
@@ -77,9 +177,7 @@ with st.form("prediction_form"):
             value=12
         )
         
-        # Calculate maximum possible total charges
-        max_possible_total = 200 * 72  # max monthly * max tenure
-        
+        max_possible_total = 200 * 72
         total_charges = st.slider(
             "Total Charges ($)",
             min_value=0,
@@ -90,47 +188,65 @@ with st.form("prediction_form"):
     submitted = st.form_submit_button("Predict Churn")
 
 if submitted:
-    # Normalize charges
-    normalized_monthly = normalize_charges(monthly_charges, 200)
-    normalized_total = normalize_charges(total_charges, max_possible_total)
-    
-    # Calculate risk score (0 to 1)
+    def calculate_tenure_impact(tenure_months):
+        if tenure_months <= 6:
+            return 0.3
+        elif tenure_months <= 12:
+            return 0.2
+        elif tenure_months <= 24:
+            return 0.1
+        elif tenure_months <= 48:
+            return -0.1
+        else:
+            return -0.2
+
+    def calculate_charges_risk(monthly, total, tenure):
+        monthly_normalized = monthly / 200.0
+        expected_total = monthly * tenure
+        total_ratio = total / max(expected_total, 1)
+        charge_risk = monthly_normalized * 0.4
+        
+        if total_ratio > 1.2:
+            charge_risk += 0.2
+        elif total_ratio < 0.8:
+            charge_risk -= 0.1
+            
+        return min(charge_risk, 0.6)
+
+    # Calculate base risk
     base_risk = 0.0
     
-    # Add risks based on services and contract
     if internet_service == "Fiber optic":
-        base_risk += 0.2
+        base_risk += 0.15
     if payment_method == "Electronic check":
         base_risk += 0.15
     if contract == "Month-to-month":
-        base_risk += 0.25
+        base_risk += 0.20
+    elif contract == "One year":
+        base_risk -= 0.15
+    elif contract == "Two year":
+        base_risk -= 0.30
     
-    # Add risks based on charges
-    charge_risk = (normalized_monthly + normalized_total) / 2
-    total_risk = base_risk + (charge_risk * 0.4)  # Charges contribute up to 40% of risk
+    # Calculate risks
+    tenure_impact = calculate_tenure_impact(tenure)
+    charges_risk = calculate_charges_risk(monthly_charges, total_charges, tenure)
+    total_risk = base_risk + tenure_impact + charges_risk
     
-    # Additional risk factors
-    if tenure < 12:
-        total_risk += 0.1
+    # Additional adjustments
     if phone_service == "Yes" and internet_service != "No":
-        total_risk += 0.1
-    
-    # Reduce risk based on protective factors
-    if contract == "Two year":
-        total_risk -= 0.2
+        total_risk += 0.05
+    if paperless_billing == "Yes":
+        total_risk += 0.05
     if payment_method in ["Bank transfer (automatic)", "Credit card (automatic)"]:
+        total_risk -= 0.10
+    
+    # Special cases
+    if monthly_charges >= 190 and tenure <= 6:
+        total_risk += 0.3
+    elif monthly_charges >= 190 and tenure >= 48:
         total_risk -= 0.1
-    if tenure > 24:
-        total_risk -= 0.1
-        
-    # Ensure risk stays between 0 and 1
+    
     total_risk = max(min(total_risk, 1.0), 0.0)
-    
-    # If charges are at maximum, force high risk
-    if monthly_charges >= 190 and total_charges >= (max_possible_total * 0.9):
-        total_risk = 1.0
-    
-    # Create prediction probability
     probability = total_risk
     prediction = 1 if probability > 0.5 else 0
     
@@ -145,60 +261,59 @@ if submitted:
             st.success("✅ Low Risk of Churn")
             
     with col2:
-        st.metric(
-            "Churn Probability",
-            f"{probability:.1%}"
-        )
+        st.metric("Churn Probability", f"{probability:.1%}")
     
-    # Display gauge chart for probability
     st.progress(probability)
 
-    # Show risk factors
+    # Risk Analysis
     st.subheader("Risk Analysis")
+    col1, col2 = st.columns(2)
     
-    # Calculate risk contributions
-    risk_factors = []
-    if internet_service == "Fiber optic":
-        risk_factors.append(("Fiber optic service", 0.20))
-    if payment_method == "Electronic check":
-        risk_factors.append(("Electronic check payment", 0.15))
-    if contract == "Month-to-month":
-        risk_factors.append(("Month-to-month contract", 0.25))
-    if normalized_total > 0.7:
-        risk_factors.append(("High total charges", normalized_total * 0.4))
-    if tenure < 12:
-        risk_factors.append(("New customer", 0.10))
-        
-    # Show risk breakdown
-    if risk_factors:
-        st.warning("**Risk Factors:**")
-        for factor, value in risk_factors:
-            st.write(f"- {factor}: +{value:.0%} risk")
+    with col1:
+        st.write("**Risk Factors:**")
+        if charges_risk > 0:
+            st.write(f"- Charges Impact: +{charges_risk:.0%}")
+        if tenure_impact > 0:
+            st.write(f"- Tenure Risk: +{tenure_impact:.0%}")
+        if internet_service == "Fiber optic":
+            st.write("- Fiber Service: +15%")
+        if payment_method == "Electronic check":
+            st.write("- Electronic Check Payment: +15%")
+        if contract == "Month-to-month":
+            st.write("- Month-to-month Contract: +20%")
             
-    # Show protective factors
-    protective_factors = []
-    if contract == "Two year":
-        protective_factors.append(("Two-year contract", 0.20))
-    if payment_method in ["Bank transfer (automatic)", "Credit card (automatic)"]:
-        protective_factors.append(("Automatic payment", 0.10))
-    if tenure > 24:
-        protective_factors.append(("Long-term customer", 0.10))
-        
-    if protective_factors:
-        st.success("**Protective Factors:**")
-        for factor, value in protective_factors:
-            st.write(f"- {factor}: -{value:.0%} risk")
+    with col2:
+        st.write("**Protective Factors:**")
+        if tenure_impact < 0:
+            st.write(f"- Long Tenure Benefit: {tenure_impact:.0%}")
+        if contract == "Two year":
+            st.write("- Two-year Contract: -30%")
+        elif contract == "One year":
+            st.write("- One-year Contract: -15%")
+        if payment_method in ["Bank transfer (automatic)", "Credit card (automatic)"]:
+            st.write("- Automatic Payment: -10%")
 
-# Add model info
+    # Relationship explanation
+    st.write("\n**Key Relationships:**")
+    st.info(f"""
+    - Tenure {tenure} months: {'Very Stable' if tenure > 48 else 'Stable' if tenure > 24 else 'Moderate' if tenure > 12 else 'New Customer'}
+    - Monthly Charges ${monthly_charges}: {'Very High' if monthly_charges >= 150 else 'High' if monthly_charges >= 100 else 'Moderate' if monthly_charges >= 50 else 'Low'}
+    - Impact of Tenure on Charges Risk: {'Significantly Reduced' if tenure > 48 else 'Reduced' if tenure > 24 else 'Slightly Reduced' if tenure > 12 else 'No Reduction'}
+    """)
+
+# Model information
 with st.expander("How is risk calculated?"):
     st.write("""
     Risk factors are weighted as follows:
-    - Contract Type: Up to 25%
-    - Service Type: Up to 20%
-    - Payment Method: Up to 15%
-    - Charges Level: Up to 40%
-    - Tenure Impact: Up to 10%
+    - Contract Type: -30% to +20%
+    - Tenure Impact: -20% to +30%
+    - Charges Impact: up to 60%
+    - Internet Service: up to 15%
+    - Payment Method: -10% to +15%
     
-    When monthly charges are very high (>$190) and total charges are near maximum, 
-    the risk automatically becomes very high.
+    Special considerations:
+    - New customers (≤6 months) with high charges have increased risk
+    - Long-term customers (>48 months) have reduced risk even with high charges
+    - Multiple services and paperless billing add small additional risk
+    - Automatic payments provide risk reduction
     """)
