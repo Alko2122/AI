@@ -7,6 +7,115 @@ from datetime import datetime
 # Page config
 st.set_page_config(page_title="Telco Customer Service", layout="wide")
 
+# Load historical data
+@st.cache_data
+def load_historical_data():
+    df = pd.read_csv('Dataset.csv')
+    return df
+
+# Load and analyze data
+historical_data = load_historical_data()
+historical_insights = analyze_historical_data(historical_data)
+
+# Modify the chat interface section
+def create_customer_profile(user_input):
+    """Extract customer profile information from chat"""
+    profile = {
+        'internet_mentioned': 'internet' in user_input.lower(),
+        'streaming_mentioned': any(word in user_input.lower() for word in ['stream', 'netflix', 'youtube']),
+        'budget_conscious': any(word in user_input.lower() for word in ['cheap', 'cost', 'budget']),
+        'business_mentioned': any(word in user_input.lower() for word in ['business', 'work', 'company']),
+    }
+    return profile
+
+# In your chat interface:
+if st.sidebar.button("Send"):
+    if user_input:
+        st.session_state.chat_history.append(("user", user_input))
+        
+        # Create customer profile from chat history
+        customer_profile = create_customer_profile(user_input)
+        
+        # Get AI response with historical insights
+        ai_response = get_assistant_response(user_input, historical_insights, customer_profile)
+        
+        st.session_state.chat_history.append(("assistant", ai_response))
+        st.experimental_rerun()
+
+# Add data insights to Quick Actions
+if st.sidebar.button("Show Service Insights"):
+    insights_message = f"""Based on our customer data:
+    • Average customer tenure: {historical_insights['avg_tenure']:.1f} months
+    • Most popular service: {historical_insights['popular_internet']}
+    • Most common contract: {historical_insights['popular_contract']}
+    • Customers with long-term contracts have {(1 - historical_insights['churn_rate_fiber']) * 100:.1f}% higher satisfaction rates
+    
+    Would you like a personalized recommendation based on these insights?"""
+    
+    st.session_state.chat_history.append(("assistant", insights_message))
+    st.experimental_rerun()
+
+def analyze_historical_data(df):
+    """Analyze historical data for insights"""
+    insights = {
+        'avg_tenure': df['tenure'].mean(),
+        'avg_monthly_charges': df['MonthlyCharges'].mean(),
+        'popular_internet': df['InternetService'].mode()[0],
+        'popular_contract': df['Contract'].mode()[0],
+        'churn_rate_fiber': df[df['InternetService']=='Fiber optic']['Churn'].mean(),
+        'churn_rate_dsl': df[df['InternetService']=='DSL']['Churn'].mean(),
+        'avg_tenure_churned': df[df['Churn']==1]['tenure'].mean(),
+        'avg_tenure_stayed': df[df['Churn']==0]['tenure'].mean(),
+    }
+    return insights
+
+def get_package_recommendation(customer_profile, insights, model):
+    """Get personalized package recommendation based on historical data"""
+    risk_score = model.predict_proba(customer_profile)[0][1]
+    
+    if risk_score > 0.7:
+        return "high_risk"
+    elif risk_score > 0.4:
+        return "medium_risk"
+    else:
+        return "low_risk"
+
+def get_data_driven_response(message, historical_insights, customer_profile=None):
+    """Generate responses using historical data insights"""
+    message = message.lower()
+    
+    # Use historical insights for specific responses
+    if 'average' in message and 'tenure' in message:
+        return f"Based on our data, customers typically stay with us for {historical_insights['avg_tenure']:.1f} months. " \
+               f"Satisfied customers average {historical_insights['avg_tenure_stayed']:.1f} months."
+               
+    elif 'popular' in message and 'service' in message:
+        return f"Our most popular internet service is {historical_insights['popular_internet']}. " \
+               f"Most customers prefer {historical_insights['popular_contract']} contracts."
+               
+    elif 'recommend' in message and customer_profile is not None:
+        risk_level = get_package_recommendation(customer_profile, historical_insights, model)
+        if risk_level == "high_risk":
+            return "Based on our analysis, I recommend our Premium package with a long-term contract. " \
+                   "This would give you the best value and service stability."
+        elif risk_level == "medium_risk":
+            return "Looking at your profile, our Standard package would be a good fit. " \
+                   "Consider a one-year contract for better rates."
+        else:
+            return "Based on your profile, you might enjoy our Basic or Standard package. " \
+                   "You have flexibility in choosing contract terms."
+                   
+    # Add more data-driven responses as needed
+    
+    return None  # Return None if no data-driven response is applicable
+
+# Modified get_assistant_response to include data-driven insights
+def get_assistant_response(message, historical_insights, customer_profile=None):
+    # First try to get a data-driven response
+    data_response = get_data_driven_response(message, historical_insights, customer_profile)
+    if data_response:
+        return data_response
+
 def get_assistant_response(message, context=None):
     """
     Improved AI assistant for telecom package recommendations with better intent recognition
