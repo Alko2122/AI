@@ -10,7 +10,7 @@ st.set_page_config(page_title="Telco Customer Service", layout="wide")
 @st.cache_data
 def load_historical_data():
     try:
-        df = pd.read_csv('dataset.csv')
+        df = pd.read_csv('Dataset.csv')
         return df
     except:
         st.warning("Historical dataset not found. Using default insights.")
