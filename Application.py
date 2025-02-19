@@ -8,9 +8,131 @@ from datetime import datetime
 # Page config
 st.set_page_config(page_title="Telco Customer Service", layout="wide")
 
-# Configure OpenAI - Replace this with your API key
-openai.api_key = "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"
+def get_assistant_response(message, context=None):
+    """
+    Custom rule-based assistant for telecom package recommendations
+    """
+    message = message.lower()
+    
+    # Package information
+    packages = {
+        'basic': {
+            'name': 'Basic Package',
+            'price': 50,
+            'internet': 'DSL (50 Mbps)',
+            'features': ['Email Support', 'Basic Internet'],
+            'best_for': 'Basic browsing and email'
+        },
+        'standard': {
+            'name': 'Standard Package',
+            'price': 85,
+            'internet': 'Fiber Optic (200 Mbps)',
+            'features': ['24/7 Support', 'Phone Service', 'High-Speed Internet'],
+            'best_for': 'Streaming and gaming'
+        },
+        'premium': {
+            'name': 'Premium Package',
+            'price': 120,
+            'internet': 'Fiber Optic (500 Mbps)',
+            'features': ['Premium Support', 'Phone Service', 'Ultra-Fast Internet', 'Cloud Storage', 'Security Suite'],
+            'best_for': 'Heavy users and businesses'
+        }
+    }
+    
+    # Handle different types of queries
+    if 'compare' in message or 'difference' in message:
+        return """Here's a comparison of our packages:
 
+📦 Basic ($50/month): 50 Mbps DSL, best for basic browsing
+📦 Standard ($85/month): 200 Mbps Fiber, great for streaming
+📦 Premium ($120/month): 500 Mbps Fiber, perfect for heavy users
+
+Would you like specific details about any package?"""
+        
+    elif 'price' in message or 'cost' in message or 'cheap' in message:
+        return """Our package prices are:
+• Basic: $50/month
+• Standard: $85/month
+• Premium: $120/month
+
+Would you like to know what features are included in each package?"""
+
+    elif 'speed' in message or 'internet' in message:
+        return """Our internet speeds:
+• Basic: 50 Mbps DSL
+• Standard: 200 Mbps Fiber Optic
+• Premium: 500 Mbps Fiber Optic
+
+What kind of internet usage do you typically have?"""
+
+    elif 'gaming' in message or 'stream' in message or 'netflix' in message:
+        return "For streaming and gaming, I recommend our Standard Package with 200 Mbps Fiber Optic internet. It provides smooth 4K streaming and low-latency gaming. Would you like to know more about its features?"
+
+    elif 'business' in message or 'work' in message or 'company' in message:
+        return "For business use, our Premium Package would be ideal. It includes 500 Mbps internet, priority support, and additional security features. Would you like me to detail the business-specific features?"
+
+    elif 'basic' in message:
+        pkg = packages['basic']
+        return f"""The Basic Package ($50/month) includes:
+• {pkg['internet']}
+• {', '.join(pkg['features'])}
+Best for: {pkg['best_for']}
+
+Would you like to compare this with other packages?"""
+
+    elif 'standard' in message:
+        pkg = packages['standard']
+        return f"""The Standard Package ($85/month) includes:
+• {pkg['internet']}
+• {', '.join(pkg['features'])}
+Best for: {pkg['best_for']}
+
+Would you like to know more about any specific feature?"""
+
+    elif 'premium' in message:
+        pkg = packages['premium']
+        return f"""The Premium Package ($120/month) includes:
+• {pkg['internet']}
+• {', '.join(pkg['features'])}
+Best for: {pkg['best_for']}
+
+Would you like to know more about our premium features?"""
+
+    elif 'help' in message or 'recommend' in message or 'suggest' in message:
+        return """I can help you choose the perfect package! Let me know about your needs:
+1. What do you mainly use the internet for?
+2. How many people will be using it?
+3. What's your monthly budget?"""
+
+    elif 'thank' in message:
+        return "You're welcome! Let me know if you need anything else. I'm here to help! 😊"
+
+    elif 'hi' in message or 'hello' in message or 'hey' in message:
+        return """Hello! 👋 Welcome to our telecom service. I can help you with:
+• Package recommendations
+• Speed comparisons
+• Price information
+• Feature details
+
+What would you like to know about?"""
+
+    else:
+        return """I'm here to help you choose the best telecom package! You can ask me about:
+• Package comparisons
+• Internet speeds
+• Prices and features
+• Specific recommendations
+
+What would you like to know?"""
+
+# Initialize chat history if it doesn't exist
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
+    # Add initial greeting
+    st.session_state.chat_history.append(
+        ("assistant", "Hello! 👋 I'm your telecom package assistant. How can I help you today?")
+    )
+   
 # Package Information for AI
 PACKAGE_INFO = """
 1. Basic Package ($50/month):
