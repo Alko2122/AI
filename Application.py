@@ -2,62 +2,34 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-from datetime import datetime
 
 # Page config
 st.set_page_config(page_title="Telco Customer Service", layout="wide")
 
-# Load historical data
+# Load and analyze historical data
 @st.cache_data
 def load_historical_data():
-    df = pd.read_csv('Dataset.csv')
-    return df
-
-# Load and analyze data
-historical_data = load_historical_data()
-historical_insights = analyze_historical_data(historical_data)
-
-# Modify the chat interface section
-def create_customer_profile(user_input):
-    """Extract customer profile information from chat"""
-    profile = {
-        'internet_mentioned': 'internet' in user_input.lower(),
-        'streaming_mentioned': any(word in user_input.lower() for word in ['stream', 'netflix', 'youtube']),
-        'budget_conscious': any(word in user_input.lower() for word in ['cheap', 'cost', 'budget']),
-        'business_mentioned': any(word in user_input.lower() for word in ['business', 'work', 'company']),
-    }
-    return profile
-
-# In your chat interface:
-if st.sidebar.button("Send"):
-    if user_input:
-        st.session_state.chat_history.append(("user", user_input))
-        
-        # Create customer profile from chat history
-        customer_profile = create_customer_profile(user_input)
-        
-        # Get AI response with historical insights
-        ai_response = get_assistant_response(user_input, historical_insights, customer_profile)
-        
-        st.session_state.chat_history.append(("assistant", ai_response))
-        st.experimental_rerun()
-
-# Add data insights to Quick Actions
-if st.sidebar.button("Show Service Insights"):
-    insights_message = f"""Based on our customer data:
-    • Average customer tenure: {historical_insights['avg_tenure']:.1f} months
-    • Most popular service: {historical_insights['popular_internet']}
-    • Most common contract: {historical_insights['popular_contract']}
-    • Customers with long-term contracts have {(1 - historical_insights['churn_rate_fiber']) * 100:.1f}% higher satisfaction rates
-    
-    Would you like a personalized recommendation based on these insights?"""
-    
-    st.session_state.chat_history.append(("assistant", insights_message))
-    st.experimental_rerun()
+    try:
+        df = pd.read_csv('dataset.csv')
+        return df
+    except:
+        st.warning("Historical dataset not found. Using default insights.")
+        return None
 
 def analyze_historical_data(df):
-    """Analyze historical data for insights"""
-    insights = {
+    if df is None:
+        return {
+            'avg_tenure': 24,
+            'avg_monthly_charges': 70,
+            'popular_internet': 'Fiber optic',
+            'popular_contract': 'Month-to-month',
+            'churn_rate_fiber': 0.4,
+            'churn_rate_dsl': 0.2,
+            'avg_tenure_churned': 12,
+            'avg_tenure_stayed': 36
+        }
+    
+    return {
         'avg_tenure': df['tenure'].mean(),
         'avg_monthly_charges': df['MonthlyCharges'].mean(),
         'popular_internet': df['InternetService'].mode()[0],
@@ -65,62 +37,51 @@ def analyze_historical_data(df):
         'churn_rate_fiber': df[df['InternetService']=='Fiber optic']['Churn'].mean(),
         'churn_rate_dsl': df[df['InternetService']=='DSL']['Churn'].mean(),
         'avg_tenure_churned': df[df['Churn']==1]['tenure'].mean(),
-        'avg_tenure_stayed': df[df['Churn']==0]['tenure'].mean(),
+        'avg_tenure_stayed': df[df['Churn']==0]['tenure'].mean()
     }
-    return insights
 
-def get_package_recommendation(customer_profile, insights, model):
-    """Get personalized package recommendation based on historical data"""
-    risk_score = model.predict_proba(customer_profile)[0][1]
-    
-    if risk_score > 0.7:
-        return "high_risk"
-    elif risk_score > 0.4:
-        return "medium_risk"
-    else:
-        return "low_risk"
+# Load historical data and get insights
+historical_data = load_historical_data()
+historical_insights = analyze_historical_data(historical_data)
 
-def get_data_driven_response(message, historical_insights, customer_profile=None):
+def get_data_driven_response(message, insights):
     """Generate responses using historical data insights"""
     message = message.lower()
     
-    # Use historical insights for specific responses
     if 'average' in message and 'tenure' in message:
-        return f"Based on our data, customers typically stay with us for {historical_insights['avg_tenure']:.1f} months. " \
-               f"Satisfied customers average {historical_insights['avg_tenure_stayed']:.1f} months."
-               
-    elif 'popular' in message and 'service' in message:
-        return f"Our most popular internet service is {historical_insights['popular_internet']}. " \
-               f"Most customers prefer {historical_insights['popular_contract']} contracts."
-               
-    elif 'recommend' in message and customer_profile is not None:
-        risk_level = get_package_recommendation(customer_profile, historical_insights, model)
-        if risk_level == "high_risk":
-            return "Based on our analysis, I recommend our Premium package with a long-term contract. " \
-                   "This would give you the best value and service stability."
-        elif risk_level == "medium_risk":
-            return "Looking at your profile, our Standard package would be a good fit. " \
-                   "Consider a one-year contract for better rates."
-        else:
-            return "Based on your profile, you might enjoy our Basic or Standard package. " \
-                   "You have flexibility in choosing contract terms."
-                   
-    # Add more data-driven responses as needed
+        return f"""Based on our customer data:
+        • Average customer tenure: {insights['avg_tenure']:.1f} months
+        • Satisfied customers stay for: {insights['avg_tenure_stayed']:.1f} months
+        
+        Would you like to know more about our long-term packages?"""
     
-    return None  # Return None if no data-driven response is applicable
+    elif 'popular' in message or 'most common' in message:
+        return f"""Based on our customer preferences:
+        • Most popular internet service: {insights['popular_internet']}
+        • Most common contract type: {insights['popular_contract']}
+        • Average monthly charges: ${insights['avg_monthly_charges']:.2f}
+        
+        Would you like to know more about any of these options?"""
+    
+    elif 'success rate' in message or 'satisfaction' in message:
+        fiber_success = (1 - insights['churn_rate_fiber']) * 100
+        dsl_success = (1 - insights['churn_rate_dsl']) * 100
+        return f"""Our customer satisfaction rates:
+        • Fiber optic service: {fiber_success:.1f}% satisfaction rate
+        • DSL service: {dsl_success:.1f}% satisfaction rate
+        
+        Which service would you like to learn more about?"""
+    
+    return None
 
-# Modified get_assistant_response to include data-driven insights
-def get_assistant_response(message, historical_insights, customer_profile=None):
-    # First try to get a data-driven response
-    data_response = get_data_driven_response(message, historical_insights, customer_profile)
+def get_assistant_response(message, insights):
+    """Main assistant response function"""
+    message = message.lower()
+    
+    # Try to get data-driven response first
+    data_response = get_data_driven_response(message, insights)
     if data_response:
         return data_response
-
-def get_assistant_response(message, context=None):
-    """
-    Improved AI assistant for telecom package recommendations with better intent recognition
-    """
-    message = message.lower()
     
     # Package information
     packages = {
@@ -147,122 +108,111 @@ def get_assistant_response(message, context=None):
         }
     }
     
-    # Intent-based responses
-    keywords = {
-        "compare": ["compare", "difference", "vs"],
-        "price": ["price", "cost", "cheap", "affordable"],
-        "speed": ["speed", "internet speed", "fast", "slow"],
-        "streaming": ["gaming", "stream", "netflix", "youtube", "4k"],
-        "business": ["business", "work", "company", "office"],
-        "recommend": ["recommend", "suggest", "best for me"],
-        "thank": ["thank", "thanks"],
-        "greeting": ["hi", "hello", "hey"],
-        "cancellation": ["cancel", "end subscription", "terminate"],
-        "discounts": ["discount", "promo", "offer", "deals"],
-        "loyalty": ["reward", "loyalty", "bonus", "long-term"]
-    }
+    # Handle different types of queries
+    if 'compare' in message or 'difference' in message:
+        avg_charge = insights['avg_monthly_charges']
+        return f"""Here's a comparison of our packages:
 
-    def check_keywords(category):
-        return any(word in message for word in keywords[category])
-    
-    # Responses based on intent
-    if check_keywords("compare"):
-        return """Here's a package comparison:
+📦 Basic ($50/month): 50 Mbps DSL, best for basic browsing
+📦 Standard ($85/month): 200 Mbps Fiber, great for streaming
+📦 Premium ($120/month): 500 Mbps Fiber, perfect for heavy users
 
-📦 **Basic** ($50/month): 50 Mbps DSL – good for browsing  
-📦 **Standard** ($85/month): 200 Mbps Fiber – great for streaming  
-📦 **Premium** ($120/month): 500 Mbps Fiber – ideal for businesses  
+For reference, our average customer spends ${avg_charge:.2f}/month.
+Would you like specific details about any package?"""
+        
+    elif 'price' in message or 'cost' in message or 'cheap' in message:
+        return f"""Our package prices are:
+• Basic: $50/month (${insights['avg_monthly_charges']-50:.2f} below average)
+• Standard: $85/month (close to average)
+• Premium: $120/month (premium features)
 
-Would you like help choosing the best one for you?"""
+Would you like to know what features are included in each package?"""
 
-    elif check_keywords("price"):
-        return """Our package pricing:
-- **Basic:** $50/month
-- **Standard:** $85/month
-- **Premium:** $120/month  
+    elif 'speed' in message or 'internet' in message:
+        popular = insights['popular_internet']
+        return f"""Our internet speeds:
+• Basic: 50 Mbps DSL
+• Standard: 200 Mbps Fiber Optic
+• Premium: 500 Mbps Fiber Optic
 
-Would you like a breakdown of features for each package?"""
+{popular} is our most popular choice. What kind of internet usage do you typically have?"""
 
-    elif check_keywords("speed"):
-        return """Our internet speeds:
-- **Basic:** 50 Mbps (DSL)
-- **Standard:** 200 Mbps (Fiber)
-- **Premium:** 500 Mbps (Fiber)  
+    elif 'gaming' in message or 'stream' in message or 'netflix' in message:
+        return f"""For streaming and gaming, I recommend our Standard Package with 200 Mbps Fiber Optic internet. 
+        
+{insights['churn_rate_fiber']*100:.1f}% of our Fiber optic customers are heavy streamers and gamers.
+Would you like to know more about its features?"""
 
-What do you usually use the internet for?"""
+    elif 'business' in message or 'work' in message or 'company' in message:
+        return """For business use, our Premium Package would be ideal. It includes:
+• 500 Mbps Fiber Optic internet
+• Priority 24/7 support
+• Enhanced security features
+• Cloud storage solution
 
-    elif check_keywords("streaming"):
-        return """For streaming and gaming, I recommend **Standard (200 Mbps Fiber)**.  
-It offers **smooth 4K streaming** and low-latency gaming.  
+Would you like me to detail the business-specific features?"""
 
-Would you like details on its features?"""
+    elif 'basic' in message:
+        pkg = packages['basic']
+        return f"""The Basic Package ($50/month) includes:
+• {pkg['internet']}
+• {', '.join(pkg['features'])}
+Best for: {pkg['best_for']}
 
-    elif check_keywords("business"):
-        return """For businesses, our **Premium Package (500 Mbps Fiber)** is ideal.  
-It includes **priority support, cloud storage, and security features**.  
+Would you like to compare this with other packages?"""
 
-Would you like a tailored business plan?"""
+    elif 'standard' in message:
+        pkg = packages['standard']
+        return f"""The Standard Package ($85/month) includes:
+• {pkg['internet']}
+• {', '.join(pkg['features'])}
+Best for: {pkg['best_for']}
 
-    elif check_keywords("recommend"):
-        return """I can help you choose the best package!  
+Would you like to know more about any specific feature?"""
+
+    elif 'premium' in message:
+        pkg = packages['premium']
+        return f"""The Premium Package ($120/month) includes:
+• {pkg['internet']}
+• {', '.join(pkg['features'])}
+Best for: {pkg['best_for']}
+
+Would you like to know more about our premium features?"""
+
+    elif 'help' in message or 'recommend' in message or 'suggest' in message:
+        return f"""I can help you choose the perfect package! 
+        
+Based on our data:
+• Most customers choose: {insights['popular_internet']}
+• Average monthly spend: ${insights['avg_monthly_charges']:.2f}
+• Typical commitment: {insights['avg_tenure']:.1f} months
+
 Let me know:
-1️⃣ What do you mainly use the internet for?  
-2️⃣ How many people will be using it?  
-3️⃣ What’s your monthly budget?"""
+1. What do you mainly use the internet for?
+2. How many people will be using it?
+3. What's your monthly budget?"""
 
-    elif check_keywords("cancellation"):
-        return """You can cancel your subscription anytime.  
-**Things to know before canceling:**  
-- Month-to-month plans can be canceled instantly.  
-- One-year and two-year contracts may have **early termination fees**.  
-Would you like help switching to a cheaper plan instead?"""
+    elif 'thank' in message:
+        return "You're welcome! Let me know if you need anything else. I'm here to help! 😊"
 
-    elif check_keywords("discounts"):
-        return """💰 **Current Offers:**  
-🎉 Get **10% off for 6 months** on our Standard & Premium plans!  
-🎯 New customers can get a **$25 sign-up bonus**.  
-Would you like me to apply a promo for you?"""
+    elif 'hi' in message or 'hello' in message or 'hey' in message:
+        return f"""Hello! 👋 Welcome to our telecom service. I can help you with:
+• Package recommendations
+• Speed comparisons
+• Price information (avg. ${insights['avg_monthly_charges']:.2f}/month)
+• Feature details
 
-    elif check_keywords("loyalty"):
-        return """🎖️ **Loyalty Rewards:**  
-- **6+ months customers**: Free speed upgrade  
-- **12+ months customers**: 5% monthly discount  
-- **24+ months customers**: Free Wi-Fi extender  
+What would you like to know about?"""
 
-Would you like to check your eligibility?"""
-
-    elif check_keywords("thank"):
-        return "You're welcome! 😊 Let me know if you need anything else."
-
-    elif check_keywords("greeting"):
-        return """Hello! 👋 I'm here to help with:  
-✅ Package recommendations  
-✅ Speed comparisons  
-✅ Price information  
-✅ Discounts & loyalty rewards  
+    else:
+        return """I'm here to help you choose the best telecom package! You can ask me about:
+• Package comparisons
+• Internet speeds
+• Prices and features
+• Specific recommendations
+• Customer satisfaction rates
 
 What would you like to know?"""
-
-    # Specific package inquiries
-    for package in packages:
-        if package in message:
-            pkg = packages[package]
-            return f"""📦 **{pkg['name']}** (${pkg['price']}/month)  
-🚀 Speed: {pkg['internet']}  
-🔹 Features: {', '.join(pkg['features'])}  
-💡 Best for: {pkg['best_for']}  
-
-Would you like to compare it with other options?"""
-
-    # Default fallback response
-    return """I'm here to assist with telecom packages!  
-You can ask about:  
-- Package comparisons  
-- Internet speeds  
-- Prices & features  
-- Discounts & offers  
-
-What can I help you with?"""
 
 # Initialize chat history
 if 'chat_history' not in st.session_state:
@@ -290,14 +240,14 @@ if st.sidebar.button("Send"):
         # Add user message to history
         st.session_state.chat_history.append(("user", user_input))
         
-        # Get assistant response
-        ai_response = get_assistant_response(user_input)
+        # Get assistant response with insights
+        ai_response = get_assistant_response(user_input, historical_insights)
         
         # Add assistant response to history
         st.session_state.chat_history.append(("assistant", ai_response))
         
         # Rerun to update chat display
-        st.rerun()
+        st.experimental_rerun()
 
 # Quick action buttons
 st.sidebar.markdown("---")
@@ -306,23 +256,23 @@ cols = st.sidebar.columns(2)
 if cols[0].button("Compare Packages"):
     comparison_query = "Compare packages"
     st.session_state.chat_history.append(("user", comparison_query))
-    ai_response = get_assistant_response(comparison_query)
+    ai_response = get_assistant_response(comparison_query, historical_insights)
     st.session_state.chat_history.append(("assistant", ai_response))
-    st.rerun()
+    st.experimental_rerun()
 
-if cols[1].button("Best Deals"):
-    deals_query = "What are your best deals?"
-    st.session_state.chat_history.append(("user", deals_query))
-    ai_response = get_assistant_response(deals_query)
+if cols[1].button("Service Insights"):
+    insights_query = "Show me service insights and statistics"
+    st.session_state.chat_history.append(("user", insights_query))
+    ai_response = get_assistant_response(insights_query, historical_insights)
     st.session_state.chat_history.append(("assistant", ai_response))
-    st.rerun()
+    st.experimental_rerun()
 
 # Clear chat button
 if st.sidebar.button("Clear Chat"):
     st.session_state.chat_history = []
     initial_ai_msg = "Hello! 👋 I'm your telecom package assistant. How can I help you today?"
     st.session_state.chat_history.append(("assistant", initial_ai_msg))
-    st.rerun()
+    st.experimental_rerun()
 
 # Main app - Churn Prediction
 st.title("Customer Churn Prediction")
