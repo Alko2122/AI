@@ -157,7 +157,7 @@ if st.sidebar.button("Send"):
         st.session_state.chat_history.append(("assistant", ai_response))
         
         # Rerun to update chat display
-        st.experimental_rerun()
+        st.rerun()
 
 # Quick action buttons
 st.sidebar.markdown("---")
