@@ -9,7 +9,7 @@ from datetime import datetime
 st.set_page_config(page_title="Telco Customer Service", layout="wide")
 
 # Configure OpenAI - Replace this with your API key
-openai.api_key = "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"
+openai.api_key = "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"
 
 # Package Information for AI
 PACKAGE_INFO = """
