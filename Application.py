@@ -8,8 +8,8 @@ from datetime import datetime
 # Page config
 st.set_page_config(page_title="Telco Customer Service", layout="wide")
 
-# Configure OpenAI
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+# Configure OpenAI - Replace this with your API key
+openai.api_key = "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"
 
 # Package Information for AI
 PACKAGE_INFO = """
