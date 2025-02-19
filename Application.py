@@ -395,4 +395,7 @@ with st.expander("How is risk calculated?"):
     
     Special considerations:
     - New customers (≤6 months) with high charges have increased risk
-    - Long-term customers (>48 months) have reduced risk even with high
+    - Long-term customers (>48 months) have reduced risk even with high charges
+    - Multiple services and paperless billing add small additional risk
+    - Automatic payments provide risk reduction
+    """)
