@@ -4,6 +4,44 @@ import numpy as np
 import joblib
 import requests
 
+# Main app - AI Assistant Sidebar
+st.sidebar.title("💬 AI Package Assistant")
+
+# Chat interface
+for message in st.session_state.chat_history:
+    role, content = message
+    if role == "user":
+        st.sidebar.markdown(f"👤 **You:** {content}")
+    else:
+        st.sidebar.markdown(f"🤖 **Assistant:** {content}")
+
+# User input
+user_input = st.sidebar.text_input("Type your message here...")
+
+# Quick action buttons
+st.sidebar.markdown("---")
+st.sidebar.markdown("**Quick Actions:**")
+cols = st.sidebar.columns(2)
+if cols[0].button("Compare Packages"):
+    comparison_query = "Compare packages"
+    st.session_state.chat_history.append(("user", comparison_query))
+    ai_response = get_assistant_response(comparison_query, historical_insights, huggingface_api_key)
+    st.session_state.chat_history.append(("assistant", ai_response))
+    st.rerun()
+
+if cols[1].button("Service Insights"):
+    insights_query = "Show me service insights and statistics"
+    st.session_state.chat_history.append(("user", insights_query))
+    ai_response = get_assistant_response(insights_query, historical_insights, huggingface_api_key)
+    st.session_state.chat_history.append(("assistant", ai_response))
+    st.rerun()
+
+# Clear chat button
+if st.sidebar.button("Clear Chat"):
+    st.session_state.chat_history = []
+    initial_ai_msg = "Hello! 👋 I'm your telecom package assistant. How can I help you today?"
+    st.session_state.chat_history.append(("assistant", initial_ai_msg))
+    st.rerun()
 
 def analyze_historical_data(df):
     if df is None:
@@ -96,7 +134,7 @@ def get_rule_based_response(message, insights):
 @st.cache_data
 def load_historical_data():
     try:
-        df = pd.read_csv('dataset.csv')
+        df = pd.read_csv('Dataset.csv')
         return df
     except:
         st.warning("Historical dataset not found. Using default insights.")
