@@ -1,11 +1,10 @@
 streamlit
 joblib
-p
 pandas
 numpy
 lightgbm
 torch
+uvicorn
 fastapi
 pydantic
-uvicorn
 scikit-learn
