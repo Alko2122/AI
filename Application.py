@@ -15,7 +15,7 @@ from sklearn.preprocessing import StandardScaler
 # Load the churn prediction model
 churn_model = joblib.load("churn_model.joblib")
 
-df = pd.read_csv("dataset.csv")  # Load dataset
+df = pd.read_csv("Dataset.csv")  # Load dataset
 scaler = StandardScaler()
 
 # FastAPI for AI-driven recommendations
