@@ -2,10 +2,117 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-
 import requests
-import streamlit as st
 
+
+def analyze_historical_data(df):
+    if df is None:
+        return {
+            'avg_tenure': 24,
+            'avg_monthly_charges': 70,
+            'popular_internet': 'Fiber optic',
+            'popular_contract': 'Month-to-month',
+            'churn_rate_fiber': 0.4,
+            'churn_rate_dsl': 0.2,
+            'avg_tenure_churned': 12,
+            'avg_tenure_stayed': 36
+        }
+    
+    # Convert Yes/No to 1/0 for churn calculation
+    df['Churn_Numeric'] = (df['Churn'] == 'Yes').astype(int)
+    
+    return {
+        'avg_tenure': df['tenure'].mean(),
+        'avg_monthly_charges': df['MonthlyCharges'].mean(),
+        'popular_internet': df['InternetService'].mode()[0],
+        'popular_contract': df['Contract'].mode()[0],
+        'churn_rate_fiber': df[df['InternetService']=='Fiber optic']['Churn_Numeric'].mean(),
+        'churn_rate_dsl': df[df['InternetService']=='DSL']['Churn_Numeric'].mean(),
+        'avg_tenure_churned': df[df['Churn']=='Yes']['tenure'].mean(),
+        'avg_tenure_stayed': df[df['Churn']=='No']['tenure'].mean()
+    }
+
+def get_data_driven_response(message, insights):
+    """Generate responses using historical data insights"""
+    message = message.lower()
+    
+    if 'average' in message and 'tenure' in message:
+        return f"""Based on our customer data:
+        • Average customer tenure: {insights['avg_tenure']:.1f} months
+        • Satisfied customers stay for: {insights['avg_tenure_stayed']:.1f} months
+        
+        Would you like to know more about our long-term packages?"""
+    
+    elif 'popular' in message or 'most common' in message:
+        return f"""Based on our customer preferences:
+        • Most popular internet service: {insights['popular_internet']}
+        • Most common contract type: {insights['popular_contract']}
+        • Average monthly charges: ${insights['avg_monthly_charges']:.2f}
+        
+        Would you like to know more about any of these options?"""
+    
+    elif 'success rate' in message or 'satisfaction' in message:
+        fiber_success = (1 - insights['churn_rate_fiber']) * 100
+        dsl_success = (1 - insights['churn_rate_dsl']) * 100
+        return f"""Our customer satisfaction rates:
+        • Fiber optic service: {fiber_success:.1f}% satisfaction rate
+        • DSL service: {dsl_success:.1f}% satisfaction rate
+        
+        Which service would you like to learn more about?"""
+    
+    return None
+
+def get_rule_based_response(message, insights):
+    """Default rule-based responses"""
+    message = message.lower()
+    
+    if 'price' in message or 'cost' in message:
+        return """Our packages range from:
+        • Basic: $50/month
+        • Standard: $85/month
+        • Premium: $120/month
+        
+        Which price range interests you?"""
+    
+    elif 'internet' in message or 'speed' in message:
+        return """We offer:
+        • DSL: 50 Mbps
+        • Fiber Optic: 200-500 Mbps
+        
+        What speed are you looking for?"""
+    
+    elif 'help' in message:
+        return """I can help you with:
+        • Package recommendations
+        • Service comparisons
+        • Pricing information
+        • Technical support
+        
+        What would you like to know?"""
+    
+    return "How can I help you choose the right package? You can ask about prices, speeds, or features."
+
+# Load historical data
+@st.cache_data
+def load_historical_data():
+    try:
+        df = pd.read_csv('dataset.csv')
+        return df
+    except:
+        st.warning("Historical dataset not found. Using default insights.")
+        return None
+
+# Initialize historical insights
+historical_data = load_historical_data()
+historical_insights = analyze_historical_data(historical_data)
+
+# Initialize chat history
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
+    st.session_state.chat_history.append(
+        ("assistant", "Hello! 👋 I'm your telecom package assistant. How can I help you today?")
+    )
+    
 def get_huggingface_response(prompt, api_key):
     API_URL = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-large"
     headers = {"Authorization": f"Bearer {api_key}"}
