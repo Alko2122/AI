@@ -9,7 +9,7 @@ st.set_page_config(page_title="Telco Customer Service", layout="wide")
 
 def get_assistant_response(message, context=None):
     """
-    Custom rule-based assistant for telecom package recommendations
+    Improved AI assistant for telecom package recommendations with better intent recognition
     """
     message = message.lower()
     
@@ -38,91 +38,122 @@ def get_assistant_response(message, context=None):
         }
     }
     
-    # Handle different types of queries
-    if 'compare' in message or 'difference' in message:
-        return """Here's a comparison of our packages:
+    # Intent-based responses
+    keywords = {
+        "compare": ["compare", "difference", "vs"],
+        "price": ["price", "cost", "cheap", "affordable"],
+        "speed": ["speed", "internet speed", "fast", "slow"],
+        "streaming": ["gaming", "stream", "netflix", "youtube", "4k"],
+        "business": ["business", "work", "company", "office"],
+        "recommend": ["recommend", "suggest", "best for me"],
+        "thank": ["thank", "thanks"],
+        "greeting": ["hi", "hello", "hey"],
+        "cancellation": ["cancel", "end subscription", "terminate"],
+        "discounts": ["discount", "promo", "offer", "deals"],
+        "loyalty": ["reward", "loyalty", "bonus", "long-term"]
+    }
 
-📦 Basic ($50/month): 50 Mbps DSL, best for basic browsing
-📦 Standard ($85/month): 200 Mbps Fiber, great for streaming
-📦 Premium ($120/month): 500 Mbps Fiber, perfect for heavy users
+    def check_keywords(category):
+        return any(word in message for word in keywords[category])
+    
+    # Responses based on intent
+    if check_keywords("compare"):
+        return """Here's a package comparison:
 
-Would you like specific details about any package?"""
-        
-    elif 'price' in message or 'cost' in message or 'cheap' in message:
-        return """Our package prices are:
-• Basic: $50/month
-• Standard: $85/month
-• Premium: $120/month
+📦 **Basic** ($50/month): 50 Mbps DSL – good for browsing  
+📦 **Standard** ($85/month): 200 Mbps Fiber – great for streaming  
+📦 **Premium** ($120/month): 500 Mbps Fiber – ideal for businesses  
 
-Would you like to know what features are included in each package?"""
+Would you like help choosing the best one for you?"""
 
-    elif 'speed' in message or 'internet' in message:
+    elif check_keywords("price"):
+        return """Our package pricing:
+- **Basic:** $50/month
+- **Standard:** $85/month
+- **Premium:** $120/month  
+
+Would you like a breakdown of features for each package?"""
+
+    elif check_keywords("speed"):
         return """Our internet speeds:
-• Basic: 50 Mbps DSL
-• Standard: 200 Mbps Fiber Optic
-• Premium: 500 Mbps Fiber Optic
+- **Basic:** 50 Mbps (DSL)
+- **Standard:** 200 Mbps (Fiber)
+- **Premium:** 500 Mbps (Fiber)  
 
-What kind of internet usage do you typically have?"""
+What do you usually use the internet for?"""
 
-    elif 'gaming' in message or 'stream' in message or 'netflix' in message:
-        return "For streaming and gaming, I recommend our Standard Package with 200 Mbps Fiber Optic internet. It provides smooth 4K streaming and low-latency gaming. Would you like to know more about its features?"
+    elif check_keywords("streaming"):
+        return """For streaming and gaming, I recommend **Standard (200 Mbps Fiber)**.  
+It offers **smooth 4K streaming** and low-latency gaming.  
 
-    elif 'business' in message or 'work' in message or 'company' in message:
-        return "For business use, our Premium Package would be ideal. It includes 500 Mbps internet, priority support, and additional security features. Would you like me to detail the business-specific features?"
+Would you like details on its features?"""
 
-    elif 'basic' in message:
-        pkg = packages['basic']
-        return f"""The Basic Package ($50/month) includes:
-• {pkg['internet']}
-• {', '.join(pkg['features'])}
-Best for: {pkg['best_for']}
+    elif check_keywords("business"):
+        return """For businesses, our **Premium Package (500 Mbps Fiber)** is ideal.  
+It includes **priority support, cloud storage, and security features**.  
 
-Would you like to compare this with other packages?"""
+Would you like a tailored business plan?"""
 
-    elif 'standard' in message:
-        pkg = packages['standard']
-        return f"""The Standard Package ($85/month) includes:
-• {pkg['internet']}
-• {', '.join(pkg['features'])}
-Best for: {pkg['best_for']}
+    elif check_keywords("recommend"):
+        return """I can help you choose the best package!  
+Let me know:
+1️⃣ What do you mainly use the internet for?  
+2️⃣ How many people will be using it?  
+3️⃣ What’s your monthly budget?"""
 
-Would you like to know more about any specific feature?"""
+    elif check_keywords("cancellation"):
+        return """You can cancel your subscription anytime.  
+**Things to know before canceling:**  
+- Month-to-month plans can be canceled instantly.  
+- One-year and two-year contracts may have **early termination fees**.  
+Would you like help switching to a cheaper plan instead?"""
 
-    elif 'premium' in message:
-        pkg = packages['premium']
-        return f"""The Premium Package ($120/month) includes:
-• {pkg['internet']}
-• {', '.join(pkg['features'])}
-Best for: {pkg['best_for']}
+    elif check_keywords("discounts"):
+        return """💰 **Current Offers:**  
+🎉 Get **10% off for 6 months** on our Standard & Premium plans!  
+🎯 New customers can get a **$25 sign-up bonus**.  
+Would you like me to apply a promo for you?"""
 
-Would you like to know more about our premium features?"""
+    elif check_keywords("loyalty"):
+        return """🎖️ **Loyalty Rewards:**  
+- **6+ months customers**: Free speed upgrade  
+- **12+ months customers**: 5% monthly discount  
+- **24+ months customers**: Free Wi-Fi extender  
 
-    elif 'help' in message or 'recommend' in message or 'suggest' in message:
-        return """I can help you choose the perfect package! Let me know about your needs:
-1. What do you mainly use the internet for?
-2. How many people will be using it?
-3. What's your monthly budget?"""
+Would you like to check your eligibility?"""
 
-    elif 'thank' in message:
-        return "You're welcome! Let me know if you need anything else. I'm here to help! 😊"
+    elif check_keywords("thank"):
+        return "You're welcome! 😊 Let me know if you need anything else."
 
-    elif 'hi' in message or 'hello' in message or 'hey' in message:
-        return """Hello! 👋 Welcome to our telecom service. I can help you with:
-• Package recommendations
-• Speed comparisons
-• Price information
-• Feature details
-
-What would you like to know about?"""
-
-    else:
-        return """I'm here to help you choose the best telecom package! You can ask me about:
-• Package comparisons
-• Internet speeds
-• Prices and features
-• Specific recommendations
+    elif check_keywords("greeting"):
+        return """Hello! 👋 I'm here to help with:  
+✅ Package recommendations  
+✅ Speed comparisons  
+✅ Price information  
+✅ Discounts & loyalty rewards  
 
 What would you like to know?"""
+
+    # Specific package inquiries
+    for package in packages:
+        if package in message:
+            pkg = packages[package]
+            return f"""📦 **{pkg['name']}** (${pkg['price']}/month)  
+🚀 Speed: {pkg['internet']}  
+🔹 Features: {', '.join(pkg['features'])}  
+💡 Best for: {pkg['best_for']}  
+
+Would you like to compare it with other options?"""
+
+    # Default fallback response
+    return """I'm here to assist with telecom packages!  
+You can ask about:  
+- Package comparisons  
+- Internet speeds  
+- Prices & features  
+- Discounts & offers  
+
+What can I help you with?"""
 
 # Initialize chat history
 if 'chat_history' not in st.session_state:
