@@ -1,219 +1,95 @@
 import streamlit as st
+import joblib
 import pandas as pd
 import numpy as np
-import joblib
-from datetime import datetime
+import lightgbm as lgb
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import json
+from fastapi import FastAPI
+from pydantic import BaseModel
+import uvicorn
+from sklearn.preprocessing import StandardScaler
 
-# Page config
-st.set_page_config(page_title="Telco Customer Service", layout="wide")
+# Load the churn prediction model
+churn_model = joblib.load("churn_model.joblib")
 
-def get_assistant_response(message, context=None):
-    """
-    Improved AI assistant for telecom package recommendations with better intent recognition
-    """
-    message = message.lower()
+df = pd.read_csv("dataset.csv")  # Load dataset
+scaler = StandardScaler()
+
+# FastAPI for AI-driven recommendations
+app = FastAPI()
+
+class CustomerData(BaseModel):
+    age: int
+    tenure: int
+    monthly_charges: float
+    total_charges: float
+    contract: str
+    payment_method: str
+
+def preprocess_customer_data(data: CustomerData):
+    # Convert categorical to numerical if needed
+    data_dict = data.dict()
+    df_temp = pd.DataFrame([data_dict])
+    df_temp = pd.get_dummies(df_temp)
+    return df_temp
+
+@app.post("/predict_churn/")
+def predict_churn(data: CustomerData):
+    processed_data = preprocess_customer_data(data)
+    prediction = churn_model.predict(processed_data)
+    return {"churn_probability": prediction.tolist()}
+
+@app.post("/recommend_plan/")
+def recommend_plan(data: CustomerData):
+    # Use past trends to recommend plans
+    suitable_plans = df[df['monthly_charges'] <= data.monthly_charges].nlargest(3, 'tenure')
+    return {"recommended_plans": suitable_plans[['plan_name', 'monthly_charges']].to_dict(orient='records')}
+
+# Streamlit chatbot interface
+st.title("Telco AI Chatbot")
+
+with st.sidebar:
+    st.header("Chat with AI")
+    user_input = st.text_input("Ask me anything about your telecom plan:")
     
-    # Package information
-    packages = {
-        'basic': {
-            'name': 'Basic Package',
-            'price': 50,
-            'internet': 'DSL (50 Mbps)',
-            'features': ['Email Support', 'Basic Internet'],
-            'best_for': 'Basic browsing and email'
-        },
-        'standard': {
-            'name': 'Standard Package',
-            'price': 85,
-            'internet': 'Fiber Optic (200 Mbps)',
-            'features': ['24/7 Support', 'Phone Service', 'High-Speed Internet'],
-            'best_for': 'Streaming and gaming'
-        },
-        'premium': {
-            'name': 'Premium Package',
-            'price': 120,
-            'internet': 'Fiber Optic (500 Mbps)',
-            'features': ['Premium Support', 'Phone Service', 'Ultra-Fast Internet', 'Cloud Storage', 'Security Suite'],
-            'best_for': 'Heavy users and businesses'
-        }
-    }
-    
-    # Intent-based responses
-    keywords = {
-        "compare": ["compare", "difference", "vs"],
-        "price": ["price", "cost", "cheap", "affordable"],
-        "speed": ["speed", "internet speed", "fast", "slow"],
-        "streaming": ["gaming", "stream", "netflix", "youtube", "4k"],
-        "business": ["business", "work", "company", "office"],
-        "recommend": ["recommend", "suggest", "best for me"],
-        "thank": ["thank", "thanks"],
-        "greeting": ["hi", "hello", "hey"],
-        "cancellation": ["cancel", "end subscription", "terminate"],
-        "discounts": ["discount", "promo", "offer", "deals"],
-        "loyalty": ["reward", "loyalty", "bonus", "long-term"]
-    }
-
-    def check_keywords(category):
-        return any(word in message for word in keywords[category])
-    
-    # Responses based on intent
-    if check_keywords("compare"):
-        return """Here's a package comparison:
-
-📦 **Basic** ($50/month): 50 Mbps DSL – good for browsing  
-📦 **Standard** ($85/month): 200 Mbps Fiber – great for streaming  
-📦 **Premium** ($120/month): 500 Mbps Fiber – ideal for businesses  
-
-Would you like help choosing the best one for you?"""
-
-    elif check_keywords("price"):
-        return """Our package pricing:
-- **Basic:** $50/month
-- **Standard:** $85/month
-- **Premium:** $120/month  
-
-Would you like a breakdown of features for each package?"""
-
-    elif check_keywords("speed"):
-        return """Our internet speeds:
-- **Basic:** 50 Mbps (DSL)
-- **Standard:** 200 Mbps (Fiber)
-- **Premium:** 500 Mbps (Fiber)  
-
-What do you usually use the internet for?"""
-
-    elif check_keywords("streaming"):
-        return """For streaming and gaming, I recommend **Standard (200 Mbps Fiber)**.  
-It offers **smooth 4K streaming** and low-latency gaming.  
-
-Would you like details on its features?"""
-
-    elif check_keywords("business"):
-        return """For businesses, our **Premium Package (500 Mbps Fiber)** is ideal.  
-It includes **priority support, cloud storage, and security features**.  
-
-Would you like a tailored business plan?"""
-
-    elif check_keywords("recommend"):
-        return """I can help you choose the best package!  
-Let me know:
-1️⃣ What do you mainly use the internet for?  
-2️⃣ How many people will be using it?  
-3️⃣ What’s your monthly budget?"""
-
-    elif check_keywords("cancellation"):
-        return """You can cancel your subscription anytime.  
-**Things to know before canceling:**  
-- Month-to-month plans can be canceled instantly.  
-- One-year and two-year contracts may have **early termination fees**.  
-Would you like help switching to a cheaper plan instead?"""
-
-    elif check_keywords("discounts"):
-        return """💰 **Current Offers:**  
-🎉 Get **10% off for 6 months** on our Standard & Premium plans!  
-🎯 New customers can get a **$25 sign-up bonus**.  
-Would you like me to apply a promo for you?"""
-
-    elif check_keywords("loyalty"):
-        return """🎖️ **Loyalty Rewards:**  
-- **6+ months customers**: Free speed upgrade  
-- **12+ months customers**: 5% monthly discount  
-- **24+ months customers**: Free Wi-Fi extender  
-
-Would you like to check your eligibility?"""
-
-    elif check_keywords("thank"):
-        return "You're welcome! 😊 Let me know if you need anything else."
-
-    elif check_keywords("greeting"):
-        return """Hello! 👋 I'm here to help with:  
-✅ Package recommendations  
-✅ Speed comparisons  
-✅ Price information  
-✅ Discounts & loyalty rewards  
-
-What would you like to know?"""
-
-    # Specific package inquiries
-    for package in packages:
-        if package in message:
-            pkg = packages[package]
-            return f"""📦 **{pkg['name']}** (${pkg['price']}/month)  
-🚀 Speed: {pkg['internet']}  
-🔹 Features: {', '.join(pkg['features'])}  
-💡 Best for: {pkg['best_for']}  
-
-Would you like to compare it with other options?"""
-
-    # Default fallback response
-    return """I'm here to assist with telecom packages!  
-You can ask about:  
-- Package comparisons  
-- Internet speeds  
-- Prices & features  
-- Discounts & offers  
-
-What can I help you with?"""
-
-# Initialize chat history
-if 'chat_history' not in st.session_state:
-    st.session_state.chat_history = []
-    # Add initial greeting
-    st.session_state.chat_history.append(
-        ("assistant", "Hello! 👋 I'm your telecom package assistant. How can I help you today?")
-    )
-
-# Main app - AI Assistant Sidebar
-st.sidebar.title("💬 AI Package Assistant")
-
-# Chat interface
-for message in st.session_state.chat_history:
-    role, content = message
-    if role == "user":
-        st.sidebar.markdown(f"👤 **You:** {content}")
-    else:
-        st.sidebar.markdown(f"🤖 **Assistant:** {content}")
-
-# User input
-user_input = st.sidebar.text_input("Type your message here...")
-if st.sidebar.button("Send"):
     if user_input:
-        # Add user message to history
-        st.session_state.chat_history.append(("user", user_input))
+        if "churn" in user_input.lower():
+            st.write("Would you like a churn prediction? Please enter your details.")
+            age = st.number_input("Age", min_value=18, max_value=100)
+            tenure = st.number_input("Tenure", min_value=0, max_value=100)
+            monthly_charges = st.number_input("Monthly Charges", min_value=0.0)
+            total_charges = st.number_input("Total Charges", min_value=0.0)
+            contract = st.selectbox("Contract Type", ["Month-to-Month", "One Year", "Two Year"])
+            payment_method = st.selectbox("Payment Method", ["Electronic Check", "Mailed Check", "Credit Card", "Bank Transfer"])
+            
+            if st.button("Predict Churn"):
+                input_data = CustomerData(
+                    age=int(age), tenure=int(tenure), monthly_charges=float(monthly_charges),
+                    total_charges=float(total_charges), contract=contract, payment_method=payment_method
+                )
+                response = predict_churn(input_data)
+                st.write(response)
         
-        # Get assistant response
-        ai_response = get_assistant_response(user_input)
+        elif "recommend" in user_input.lower() or "plan" in user_input.lower():
+            st.write("Tell me about your budget, and I'll suggest a plan.")
+            monthly_budget = st.number_input("Enter your budget:", min_value=0.0)
+            
+            if st.button("Get Plan Recommendations"):
+                input_data = CustomerData(
+                    age=30, tenure=12, monthly_charges=float(monthly_budget),
+                    total_charges=monthly_budget * 12, contract="Month-to-Month", payment_method="Electronic Check"
+                )
+                response = recommend_plan(input_data)
+                st.write(response)
         
-        # Add assistant response to history
-        st.session_state.chat_history.append(("assistant", ai_response))
-        
-        # Rerun to update chat display
-        st.rerun()
+        else:
+            st.write("I can help with churn prediction and plan recommendations. Try asking about those!")
 
-# Quick action buttons
-st.sidebar.markdown("---")
-st.sidebar.markdown("**Quick Actions:**")
-cols = st.sidebar.columns(2)
-if cols[0].button("Compare Packages"):
-    comparison_query = "Compare packages"
-    st.session_state.chat_history.append(("user", comparison_query))
-    ai_response = get_assistant_response(comparison_query)
-    st.session_state.chat_history.append(("assistant", ai_response))
-    st.rerun()
-
-if cols[1].button("Best Deals"):
-    deals_query = "What are your best deals?"
-    st.session_state.chat_history.append(("user", deals_query))
-    ai_response = get_assistant_response(deals_query)
-    st.session_state.chat_history.append(("assistant", ai_response))
-    st.rerun()
-
-# Clear chat button
-if st.sidebar.button("Clear Chat"):
-    st.session_state.chat_history = []
-    initial_ai_msg = "Hello! 👋 I'm your telecom package assistant. How can I help you today?"
-    st.session_state.chat_history.append(("assistant", initial_ai_msg))
-    st.rerun()
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 # Main app - Churn Prediction
 st.title("Customer Churn Prediction")
