@@ -12,6 +12,9 @@ from pydantic import BaseModel
 import uvicorn
 from sklearn.preprocessing import StandardScaler
 from typing import Dict
+import threading
+import asyncio
+import os
 
 # FastAPI for AI-driven recommendations
 app = FastAPI()
@@ -365,14 +368,27 @@ def main():
         - Automatic payments provide risk reduction
         """)
 
+def run_fastapi():
+    """Runs the FastAPI application using Uvicorn."""
+    try:
+        asyncio.run(uvicorn.run(app, host="0.0.0.0", port=8000))
+    except Exception as e:
+        print(f"FastAPI run failed: {e}")
+
+
 if __name__ == "__main__":
-    import threading
-    import asyncio
+    # Check if the port is already in use
+    import socket
+
+    def is_port_in_use(port: int) -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', port)) == 0
+
+    if is_port_in_use(8000):
+        print("Port 8000 is already in use.  Please kill the process using it or change the port.")
+        os._exit(1)  # Exit immediately to prevent further issues
 
     # Start FastAPI in a separate thread
-    def run_fastapi():
-        asyncio.run(uvicorn.run(app, host="0.0.0.0", port=8000))
-
     fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
     fastapi_thread.start()
 
