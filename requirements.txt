@@ -5,4 +5,4 @@ lightgbm>=3.3.2
 streamlit>=1.22.0
 joblib>=1.1.0
 matplotlib>=3.5.2
-openai==0.28.0
+
