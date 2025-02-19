@@ -8,8 +8,8 @@ joblib
 numpy==1.26.4  # Make sure numpy is compatible with scikit-learn
 lightgbm==4.1.0   #Explicitly define version
 
-torch==2.1.0       #Add torch
-torchvision==0.16.0 #Add torchvision
-torchaudio==0.11.0  #Add torchaudio
+torch==2.3.0       #Try a newer version
+torchvision==0.18.0 #Try a newer version
+torchaudio==0.13.0  #Try a newer version
 pydantic
 typing-extensions #Check to make sure this package is included, since you are getting it with typing import
