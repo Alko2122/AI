@@ -1,9 +1,15 @@
-streamlit
+streamlit==1.29.0  # Known to have better compatibility
 fastapi
 uvicorn
 requests
 pandas
-scikit-learn==1.4.2 #Match the version used to train the model to avoid warning
+scikit-learn==1.4.2  # Match the version used to train the model
 joblib
-numpy==1.26.4 #make sure numpy is compatible with scikit-learn
-lightgbm
+numpy==1.26.4  # Make sure numpy is compatible with scikit-learn
+lightgbm==4.1.0   #Explicitly define version
+
+torch==2.1.0       #Add torch
+torchvision==0.16.0 #Add torchvision
+torchaudio==0.11.0  #Add torchaudio
+pydantic
+typing-extensions #Check to make sure this package is included, since you are getting it with typing import
