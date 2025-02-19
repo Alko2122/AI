@@ -132,7 +132,10 @@ def main():
                         total_charges=float(total_charges), contract=contract, payment_method=payment_method
                     )
                     if MODEL_LOADED:
-                        response = predict_churn_with_model(input_data)
+                        # response = predict_churn_with_model(input_data)
+                        # st.write(response)
+                        import asyncio
+                        response = asyncio.run(predict_churn(input_data))
                         st.write(response)
                     else:
                         st.error("Churn model not loaded.  Cannot predict churn.")
@@ -146,7 +149,8 @@ def main():
                         age=30, tenure=12, monthly_charges=float(monthly_budget),
                         total_charges=monthly_budget * 12, contract="Month-to-Month", payment_method="Electronic Check"
                     )
-                    response = recommend_plan(input_data)
+                    import asyncio
+                    response = asyncio.run(recommend_plan(input_data))
                     st.write(response)
 
             else:
@@ -363,10 +367,11 @@ def main():
 
 if __name__ == "__main__":
     import threading
+    import asyncio
 
     # Start FastAPI in a separate thread
     def run_fastapi():
-        uvicorn.run(app, host="0.0.0.0", port=8000)
+        asyncio.run(uvicorn.run(app, host="0.0.0.0", port=8000))
 
     fastapi_thread = threading.Thread(target=run_fastapi, daemon=True)
     fastapi_thread.start()
