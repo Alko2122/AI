@@ -1,4 +1,14 @@
 streamlit
 pandas
 numpy
+scikit-learn
 joblib
+lightgbm
+matplotlib
+seaborn
+scipy
+statsmodels
+durbin-watson
+geopy
+ipywidgets
+requests
