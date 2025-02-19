@@ -1,4 +1,8 @@
 streamlit
+fastapi
+uvicorn
+requests
 pandas
-numpy
+scikit-learn==1.4.2 #Match the version used to train the model to avoid warning
 joblib
+numpy==1.26.4 #make sure numpy is compatible with scikit-learn
