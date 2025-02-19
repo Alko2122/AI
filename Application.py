@@ -29,15 +29,18 @@ def analyze_historical_data(df):
             'avg_tenure_stayed': 36
         }
     
+    # Convert Yes/No to 1/0 for churn calculation
+    df['Churn_Numeric'] = (df['Churn'] == 'Yes').astype(int)
+    
     return {
         'avg_tenure': df['tenure'].mean(),
         'avg_monthly_charges': df['MonthlyCharges'].mean(),
         'popular_internet': df['InternetService'].mode()[0],
         'popular_contract': df['Contract'].mode()[0],
-        'churn_rate_fiber': df[df['InternetService']=='Fiber optic']['Churn'].mean(),
-        'churn_rate_dsl': df[df['InternetService']=='DSL']['Churn'].mean(),
-        'avg_tenure_churned': df[df['Churn']==1]['tenure'].mean(),
-        'avg_tenure_stayed': df[df['Churn']==0]['tenure'].mean()
+        'churn_rate_fiber': df[df['InternetService']=='Fiber optic']['Churn_Numeric'].mean(),
+        'churn_rate_dsl': df[df['InternetService']=='DSL']['Churn_Numeric'].mean(),
+        'avg_tenure_churned': df[df['Churn']=='Yes']['tenure'].mean(),
+        'avg_tenure_stayed': df[df['Churn']=='No']['tenure'].mean()
     }
 
 # Load historical data and get insights
