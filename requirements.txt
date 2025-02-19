@@ -1,10 +1,4 @@
 streamlit
-joblib
 pandas
 numpy
-lightgbm
-torch
-uvicorn
-fastapi
-pydantic
-scikit-learn
+joblib
