@@ -124,12 +124,12 @@ def get_rule_based_response(message, insights):
     return "How can I help you choose the right package? You can ask about prices, speeds, or features."
 
 def get_assistant_response(message, insights, hf_api_key=None):
-    # First try to get a data-driven response
+    
     data_response = get_data_driven_response(message, insights)
     if data_response:
         return data_response
         
-    # If no data-driven response and HuggingFace API is available, use it
+    # If no data-driven response and HuggingFace API is available
     if hf_api_key:
         ai_response = get_huggingface_response(message, hf_api_key)
         if ai_response and "error" not in ai_response.lower():
