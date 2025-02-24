@@ -324,21 +324,21 @@ if submitted:
     # Combine all risk factors
     total_risk = base_risk + tenure_impact + charges_risk
     
-    # Additional service-based adjustments
+    # Additional adjustments for realistic output
     if phone_service == "Yes" and internet_service != "No":
         total_risk += 0.05
     if paperless_billing == "Yes":
         total_risk += 0.05
     
-    # Payment method adjustments
+  
     if payment_method in ["Bank transfer (automatic)", "Credit card (automatic)"]:
         total_risk -= 0.10
     
     # Special cases
     if monthly_charges >= 190 and tenure <= 6:
-        total_risk += 0.3  # Very high risk for new customers with high charges
+        total_risk += 0.3  
     elif monthly_charges >= 190 and tenure >= 48:
-        total_risk -= 0.1  # Lower risk for long-term customers even with high charges
+        total_risk -= 0.1  
     
     # Ensure risk stays between 0 and 1
     total_risk = max(min(total_risk, 1.0), 0.0)
